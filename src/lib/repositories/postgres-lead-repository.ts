@@ -44,10 +44,11 @@ export class PostgresLeadRepository implements LeadRepository {
     const conditions: SQL[] = [];
     if (filters.query) {
       const q = `%${filters.query}%`;
-      conditions.push(or(
+      const queryCondition = or(
         ilike(leads.name, q), ilike(leads.website, q), ilike(leads.phone, q), ilike(leads.email, q),
         ilike(leads.segment, q), ilike(leads.city, q), sql`${leads.tags}::text ILIKE ${q}`,
-      ));
+      );
+      if (queryCondition) conditions.push(queryCondition);
     }
     if (filters.status) conditions.push(eq(leads.status, filters.status));
     if (filters.statuses?.length) conditions.push(inArray(leads.status, filters.statuses));
