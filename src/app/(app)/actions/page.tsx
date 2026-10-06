@@ -13,12 +13,12 @@ import { listTasks } from "@/lib/services/tasks";
 function fmt(value?:string|null){if(!value)return"Sem data";return new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}).format(new Date(value));}
 
 export default async function ActionsPage({searchParams}:{searchParams:Promise<{owner?:string}>}) {
-  const [{owner}, currentUser, users] = await Promise.all([searchParams, requireCurrentUser(), listUsers()]);
+  const { owner } = await searchParams;
+  const currentUser = await requireCurrentUser();
+  const users = await listUsers();
   const ownerId = owner === "me" ? currentUser.id : owner || undefined;
-  const [tasksResult,noActionResult]=await Promise.all([
-    listTasks({statuses:["TODO","DOING"],ownerId,limit:100}),
-    searchLeads({statuses:ACTIVE_STATUSES,noNextAction:true,ownerId,limit:100}),
-  ]);
+  const tasksResult = await listTasks({statuses:["TODO","DOING"],ownerId,limit:100});
+  const noActionResult = await searchLeads({statuses:ACTIVE_STATUSES,noNextAction:true,ownerId,limit:100});
   const grouped=groupTasksForAction(tasksResult.items);
   return <><PageHeader title="Needs Action" description="Fila operacional da equipe ou de um responsável específico."/>
     <form method="get" className="mb-4 flex max-w-sm gap-2"><select name="owner" defaultValue={owner??""} className="h-9 flex-1 rounded-md border border-default bg-[var(--panel)] px-3 text-sm"><option value="">All team</option><option value="me">Mine</option>{users.map(user=><option key={user.id} value={user.id}>{user.name}</option>)}</select><button className="rounded-md bg-[var(--text)] px-3 text-xs font-medium text-[var(--panel)]">Filter</button></form>
