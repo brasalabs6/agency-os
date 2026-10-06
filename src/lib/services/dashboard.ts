@@ -61,43 +61,41 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     ),
   );
 
-  const [statusRows, attentionRows, taskRows] = await Promise.all([
-    db
-      .select({ status: leads.status, count: sql<number>`count(*)::int` })
-      .from(leads)
-      .groupBy(leads.status),
+  const statusRows = await db
+    .select({ status: leads.status, count: sql<number>`count(*)::int` })
+    .from(leads)
+    .groupBy(leads.status);
 
-    db
-      .select()
-      .from(leads)
-      .where(attentionCondition)
-      .orderBy(desc(leads.score), desc(leads.updatedAt))
-      .limit(8),
+  const attentionRows = await db
+    .select()
+    .from(leads)
+    .where(attentionCondition)
+    .orderBy(desc(leads.score), desc(leads.updatedAt))
+    .limit(8);
 
-    db.execute(sql<{
-      tasks_today: number;
-      overdue_tasks: number;
-      meetings_today: number;
-    }>`
-      select
-        count(*) filter (
-          where status in ('TODO', 'DOING')
-            and coalesce(due_at, start_at) >= ${startIso}::timestamptz
-            and coalesce(due_at, start_at) <= ${endIso}::timestamptz
-        )::int as tasks_today,
-        count(*) filter (
-          where status in ('TODO', 'DOING')
-            and coalesce(due_at, start_at) < ${nowIso}::timestamptz
-        )::int as overdue_tasks,
-        count(*) filter (
-          where status in ('TODO', 'DOING')
-            and type = 'MEETING'
-            and coalesce(due_at, start_at) >= ${startIso}::timestamptz
-            and coalesce(due_at, start_at) <= ${endIso}::timestamptz
-        )::int as meetings_today
-      from ${leadTasks}
-    `),
-  ]);
+  const taskRows = await db.execute(sql<{
+    tasks_today: number;
+    overdue_tasks: number;
+    meetings_today: number;
+  }>`
+    select
+      count(*) filter (
+        where status in ('TODO', 'DOING')
+          and coalesce(due_at, start_at) >= ${startIso}::timestamptz
+          and coalesce(due_at, start_at) <= ${endIso}::timestamptz
+      )::int as tasks_today,
+      count(*) filter (
+        where status in ('TODO', 'DOING')
+          and coalesce(due_at, start_at) < ${nowIso}::timestamptz
+      )::int as overdue_tasks,
+      count(*) filter (
+        where status in ('TODO', 'DOING')
+          and type = 'MEETING'
+          and coalesce(due_at, start_at) >= ${startIso}::timestamptz
+          and coalesce(due_at, start_at) <= ${endIso}::timestamptz
+      )::int as meetings_today
+    from ${leadTasks}
+  `);
 
   const countsByStatus: DashboardSummary["countsByStatus"] = {};
   for (const status of LEAD_STATUSES) countsByStatus[status] = 0;
