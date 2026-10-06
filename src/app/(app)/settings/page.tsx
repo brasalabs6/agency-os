@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Copy, Database, KeyRound, Server, Users } from "lucide-react";
+import { Bot, Copy, Database, KeyRound, Server, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { requireAdminUser } from "@/lib/auth/app-auth";
 

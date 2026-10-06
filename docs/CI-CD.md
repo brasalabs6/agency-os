@@ -1,0 +1,143 @@
+# AgencyOS CI/CD
+
+## Goals
+
+Production must fail closed: code can reach production only after quality checks pass, the Vercel build succeeds, and a post-deploy smoke test confirms that the production alias is serving the expected commit.
+
+All GitHub Actions jobs run on GitHub-hosted public runners (`ubuntu-latest`). No self-hosted runner is required.
+
+## Pipeline
+
+```text
+push / pull request
+        |
+        v
+GitHub Actions — Quality Gate
+  npm ci
+  migration sequence validation
+  lint
+  typecheck
+  unit tests
+  Next production build
+  local runtime smoke
+        |
+        +-------------------------+
+        |                         |
+       PR                        main
+        |                         |
+        v                         v
+Vercel Preview            Vercel production waits
+status must pass           for Quality Gate = green
+                                  |
+                                  v
+                          Vercel build/deploy
+                                  |
+                                  v
+                          Production Smoke
+                            expected Git SHA
+                            /api/health
+                            database=ok
+                            /login
+                            anonymous home redirect
+```
+
+## GitHub Actions
+
+### CI
+
+File: `.github/workflows/ci.yml`
+
+The required application-quality check is named **Quality Gate**.
+
+It runs:
+
+- `npm ci`
+- migration sequence validation
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- a local smoke test against the built Next.js artifact
+
+On pull requests it also waits for Vercel's **Vercel** commit status, producing the **Vercel Preview** check.
+
+### Production Smoke
+
+File: `.github/workflows/post-deploy-smoke.yml`
+
+After a successful CI run on `main`, it waits for Vercel production and then verifies:
+
+- the production health endpoint reports the exact expected Git SHA;
+- database health is `ok`;
+- the environment is `production`;
+- `/login` renders;
+- an anonymous request to `/` reaches the login flow.
+
+## Vercel production gate
+
+The Vercel project uses:
+
+```text
+bash scripts/vercel-ci-gate.sh
+```
+
+as its Ignored Build Step command.
+
+For preview branches the script allows builds immediately.
+
+For `main`, it polls GitHub for the **Quality Gate** check attached to the exact commit. Vercel proceeds only after that check succeeds. If CI fails or does not complete inside the gate window, the production deployment is ignored.
+
+This means even a direct push to `main` does not automatically become production.
+
+## Database migrations
+
+Production migrations are intentionally not run by PR workflows or Vercel builds.
+
+Rules:
+
+1. SQL migrations are versioned under `drizzle/`.
+2. CI validates unique and strictly ordered numeric migration prefixes.
+3. Migrations must remain backward-compatible with the currently deployed app.
+4. Apply migrations deliberately to Supabase and verify schema/RLS before code that depends on them is promoted.
+5. Do not run `drizzle-kit push` automatically against production.
+
+## GitHub main ruleset
+
+Repository-level branch protection is an administration setting, not a repository file.
+
+Recommended rules for `main`:
+
+- require a pull request before merging;
+- require **Quality Gate**;
+- require **Vercel Preview** for PRs;
+- require the branch to be up to date before merging;
+- block force pushes;
+- block branch deletion;
+- optionally require one approval when the team grows.
+
+The GitHub connector used to implement this pipeline does not have repository administration permission, so it cannot create the ruleset itself. Production deployment is still CI-gated at Vercel even without this GitHub setting.
+
+## Failure behavior
+
+- Lint/type/test/build failure: **Quality Gate** fails and Vercel production is ignored.
+- Vercel Preview failure: **Vercel Preview** fails on the PR.
+- Vercel production build failure: the previous production alias remains live.
+- Wrong production SHA: **Production Smoke** fails.
+- Database/health failure: **Production Smoke** fails.
+- A hung route cannot hide indefinitely because health and route smoke requests use explicit timeouts.
+
+## Production health contract
+
+`GET /api/health` exposes non-secret deployment metadata:
+
+```json
+{
+  "ok": true,
+  "dataDriver": "postgres",
+  "database": "ok",
+  "environment": "production",
+  "commit": "<VERCEL_GIT_COMMIT_SHA>"
+}
+```
+
+This allows CI to prove that the production alias has converged to the same commit that passed the quality gate.

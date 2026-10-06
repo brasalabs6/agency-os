@@ -23,6 +23,7 @@ Mini CRM interno **agent-first** para uma agência de sites, landing pages, auto
 - Evidence/source ledger.
 - Activity timeline com `USER`, `AGENT` e `SYSTEM`.
 - Login individual por email/senha com roles `ADMIN`/`MEMBER`, sessões revogáveis e Team management.
+- Credenciais MCP individuais por usuário para conectar múltiplas contas ChatGPT sem OAuth.
 - Ownership por usuário em Leads/Tasks, `Assign to me` e filtros por responsável.
 - Audit log para operações mutáveis de domínio/MCP.
 - Data driver `mock` para execução rápida.
@@ -78,7 +79,7 @@ npm run db:seed
 npm run dev
 ```
 
-`drizzle/0000_initial.sql` contém o schema inicial, `0001_lead_tasks_calendar.sql` adiciona Tasks/Calendar e `0002_team_auth.sql` adiciona autenticação multiusuário e sessões.
+`drizzle/0000_initial.sql` contém o schema inicial; migrations posteriores adicionam Tasks/Calendar, autenticação multiusuário, hardening do Data API e `0007_mcp_user_credentials.sql` adiciona credentials MCP por usuário.
 
 ## Autenticação do app
 
@@ -323,3 +324,26 @@ Specs implementadas:
 
 - `docs/FEATURE-LEAD-TASKS-CALENDAR.md`
 - `docs/FEATURE-TEAM-AUTH-MULTI-USER.md`
+
+
+## ChatGPT pessoal por usuário
+
+Cada usuário pode abrir `/settings/mcp`, criar uma conexão e copiar uma Server URL única.
+
+No ChatGPT:
+
+```text
+Add custom MCP server
+Server URL = URL gerada pelo AgencyOS
+Authentication = No authentication
+```
+
+Depois da migration e dos testes das duas contas ChatGPT, configure:
+
+```env
+MCP_AUTH_MODE=user_query_token
+```
+
+O banco guarda somente SHA-256 da credential; o segredo completo é exibido uma única vez. O Agent MCP continua com `actorType=AGENT`, mas carrega `principalUserId` para suportar `mine` e `assignToMe`.
+
+Veja `docs/FEATURE-PER-USER-CHATGPT-MCP-CREDENTIALS.md`.

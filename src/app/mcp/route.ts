@@ -9,9 +9,14 @@ async function handle(request: Request) {
     return handler.fetch(request);
   } catch (error) {
     const err = asDomainError(error);
+    const mode = process.env.MCP_AUTH_MODE ?? "token";
+    const shouldChallenge = err.status === 401 && mode !== "user_query_token";
     return Response.json({ error: err.code, message: err.message }, {
       status: err.status,
-      headers: err.status === 401 ? { "WWW-Authenticate": `Bearer resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource/mcp"` } : undefined,
+      headers: {
+        "Cache-Control": "no-store",
+        ...(shouldChallenge ? { "WWW-Authenticate": `Bearer resource_metadata="${new URL(request.url).origin}/.well-known/oauth-protected-resource/mcp"` } : {}),
+      },
     });
   }
 }

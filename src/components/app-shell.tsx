@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Activity, Bot, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -67,7 +67,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Authen
       {collapsed ? <div className="px-2 pt-2"><button onClick={toggleSidebar} className="focus-ring grid h-10 w-full place-items-center rounded-lg text-muted hover:bg-[var(--panel-2)] hover:text-[var(--text)]" aria-label="Expandir barra lateral" title="Expandir barra lateral"><PanelLeftOpen size={17}/></button></div> : null}
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">{nav.map((item) => <NavItem key={item.href} {...item} pathname={pathname} collapsed={collapsed}/>)}</nav>
       <div className="space-y-1 border-t border-default p-2">
-        <NavItem href="/settings/profile" label="Perfil" icon={UserRound} pathname={pathname} collapsed={collapsed}/>
+        <NavItem href="/settings/profile" label="Perfil" icon={UserRound} pathname={pathname} collapsed={collapsed}/><NavItem href="/settings/mcp" label="ChatGPT" icon={Bot} pathname={pathname} collapsed={collapsed}/>
         {user.role === "ADMIN" ? <><NavItem href="/settings/team" label="Equipe" icon={Users} pathname={pathname} collapsed={collapsed}/><NavItem href="/settings" label="Configurações" icon={Settings} pathname={pathname} collapsed={collapsed}/></> : null}
       </div>
       <div className="border-t border-default p-2">
@@ -93,7 +93,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Authen
     {mobileOpen ? <div className="fixed inset-0 z-50 md:hidden" role="presentation"><button className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} aria-label="Fechar menu"/><aside className="relative flex h-full w-[min(86vw,320px)] flex-col border-r border-default bg-[var(--panel)] shadow-2xl">
       <div className="flex h-14 items-center justify-between border-b border-default px-3"><Link href="/" className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--text)] text-[var(--panel)]"><Activity size={16}/></span><span><span className="block text-sm font-semibold">AgencyOS</span><span className="block text-[10px] uppercase tracking-[0.14em] text-muted">CRM</span></span></Link><button onClick={() => setMobileOpen(false)} className="focus-ring grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-[var(--panel-2)]" aria-label="Fechar menu"><X size={18}/></button></div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">{nav.map((item) => <NavItem key={item.href} {...item} pathname={pathname} onNavigate={() => setMobileOpen(false)}/>)}</nav>
-      <div className="space-y-1 border-t border-default p-3"><NavItem href="/settings/profile" label="Perfil" icon={UserRound} pathname={pathname} onNavigate={() => setMobileOpen(false)}/>{user.role === "ADMIN" ? <><NavItem href="/settings/team" label="Equipe" icon={Users} pathname={pathname} onNavigate={() => setMobileOpen(false)}/><NavItem href="/settings" label="Configurações" icon={Settings} pathname={pathname} onNavigate={() => setMobileOpen(false)}/></> : null}</div>
+      <div className="space-y-1 border-t border-default p-3"><NavItem href="/settings/profile" label="Perfil" icon={UserRound} pathname={pathname} onNavigate={() => setMobileOpen(false)}/><NavItem href="/settings/mcp" label="ChatGPT" icon={Bot} pathname={pathname} onNavigate={() => setMobileOpen(false)}/>{user.role === "ADMIN" ? <><NavItem href="/settings/team" label="Equipe" icon={Users} pathname={pathname} onNavigate={() => setMobileOpen(false)}/><NavItem href="/settings" label="Configurações" icon={Settings} pathname={pathname} onNavigate={() => setMobileOpen(false)}/></> : null}</div>
       <div className="border-t border-default p-3"><div className="mb-2 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--panel-2)] text-xs font-semibold">{initials}</span><div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{user.name}</div><div className="text-[10px] text-muted">{user.role}</div></div><ThemeToggle/></div><form method="post" action="/api/auth/logout"><button className="focus-ring flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm text-muted hover:bg-[var(--panel-2)] hover:text-[var(--text)]"><LogOut size={15}/>Sair</button></form></div>
     </aside></div> : null}
   </div>;

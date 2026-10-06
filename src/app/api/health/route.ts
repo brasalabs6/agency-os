@@ -24,6 +24,8 @@ export async function GET() {
     service: "agencyos-leads",
     dataDriver,
     database: dataDriver === "postgres" ? "ok" : "not_applicable",
+    environment: process.env.VERCEL_ENV ?? null,
+    commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     timestamp: new Date().toISOString(),
   });
 }
