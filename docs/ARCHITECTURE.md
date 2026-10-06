@@ -50,3 +50,9 @@ A interface não depende do MCP ou React.
 `audit_logs` representa as operações técnicas executadas, incluindo tool MCP, actor, input e resultado resumido.
 
 Não é armazenado chain-of-thought do modelo.
+
+## Tasks and calendar
+
+`LeadTask` is a lead-scoped domain entity with its own repository (`TaskRepository`) and service (`src/lib/services/tasks.ts`). The same service is consumed by REST, UI and MCP. The lead's legacy `nextAction`, `nextActionAt` and `nextActionOwner` fields are compatibility projections derived from the highest-priority active task according to the task ordering rules.
+
+Task dates are stored as UTC timestamps. Operational day boundaries use `America/Sao_Paulo` by default through `src/lib/domain/time.ts`. Calendar reads are interval-bounded and never load the entire task table.

@@ -1,0 +1,11 @@
+import { z } from "zod";
+import { LEAD_TASK_PRIORITIES, LEAD_TASK_STATUSES, LEAD_TASK_TYPES } from "@/lib/domain/types";
+const nullableDate = z.string().datetime().nullable().optional();
+const queryBoolean = z.enum(["true", "false"]).transform((value) => value === "true").optional();
+export const createTaskSchema = z.object({ leadId: z.string().uuid(), title: z.string().trim().min(1).max(300), description: z.string().trim().max(5000).nullable().optional(), type: z.enum(LEAD_TASK_TYPES).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), dueAt: nullableDate, startAt: nullableDate, endAt: nullableDate, allDay: z.boolean().optional(), ownerId: z.string().uuid().nullable().optional(), order: z.number().int().optional() });
+export const updateTaskSchema = createTaskSchema.omit({ leadId: true }).partial().extend({ status: z.enum(["TODO", "DOING"]).optional(), expectedVersion: z.number().int().positive().optional() });
+export const completeTaskSchema = z.object({ expectedVersion: z.number().int().positive().optional() });
+export const cancelTaskSchema = z.object({ reason: z.string().trim().max(1000).optional(), expectedVersion: z.number().int().positive().optional() });
+export const rescheduleTaskSchema = z.object({ dueAt: nullableDate, startAt: nullableDate, endAt: nullableDate, allDay: z.boolean().optional(), expectedVersion: z.number().int().positive().optional() });
+export const reorderTasksSchema = z.object({ items: z.array(z.object({ taskId: z.string().uuid(), order: z.number().int(), expectedVersion: z.number().int().positive().optional() })).min(1).max(100) });
+export const taskQuerySchema = z.object({ leadId: z.string().uuid().optional(), ownerId: z.string().uuid().optional(), status: z.enum(LEAD_TASK_STATUSES).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), type: z.enum(LEAD_TASK_TYPES).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional(), overdue: queryBoolean, dueToday: queryBoolean, noDate: queryBoolean, includeCompleted: queryBoolean, limit: z.coerce.number().int().min(1).max(500).optional(), offset: z.coerce.number().int().min(0).optional() });

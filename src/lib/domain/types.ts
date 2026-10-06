@@ -31,6 +31,23 @@ export const SERVICE_OPPORTUNITIES = [
 
 export type ServiceOpportunity = (typeof SERVICE_OPPORTUNITIES)[number];
 
+export const LEAD_TASK_TYPES = [
+  "TASK",
+  "CALL",
+  "FOLLOW_UP",
+  "MEETING",
+  "RESEARCH",
+  "PROPOSAL",
+  "OTHER",
+] as const;
+export type LeadTaskType = (typeof LEAD_TASK_TYPES)[number];
+
+export const LEAD_TASK_STATUSES = ["TODO", "DOING", "DONE", "CANCELED"] as const;
+export type LeadTaskStatus = (typeof LEAD_TASK_STATUSES)[number];
+
+export const LEAD_TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+export type LeadTaskPriority = (typeof LEAD_TASK_PRIORITIES)[number];
+
 export type ActorType = "USER" | "AGENT" | "SYSTEM";
 export type UserRole = "ADMIN" | "MEMBER";
 
@@ -86,7 +103,15 @@ export type ActivityType =
   | "SOURCE_ADDED"
   | "AGENT_ACTION"
   | "WON"
-  | "LOST";
+  | "LOST"
+  | "TASK_CREATED"
+  | "TASK_UPDATED"
+  | "TASK_STARTED"
+  | "TASK_COMPLETED"
+  | "TASK_CANCELED"
+  | "TASK_RESCHEDULED"
+  | "TASK_REASSIGNED"
+  | "TASK_REORDERED";
 
 export interface LeadActivity {
   id: string;
@@ -125,6 +150,40 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface LeadTask {
+  id: string;
+  leadId: string;
+  title: string;
+  description?: string | null;
+  type: LeadTaskType;
+  status: LeadTaskStatus;
+  priority: LeadTaskPriority;
+  dueAt?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  allDay: boolean;
+  owner?: UserSummary | null;
+  order: number;
+  createdByType: ActorType;
+  createdById?: string | null;
+  completedAt?: string | null;
+  canceledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface LeadTaskLeadSummary {
+  id: string;
+  name: string;
+  status: LeadStatus;
+  score?: number | null;
+}
+
+export interface LeadTaskView extends LeadTask {
+  lead: LeadTaskLeadSummary;
+}
+
 export interface LeadSearchFilters {
   query?: string;
   status?: LeadStatus;
@@ -146,6 +205,32 @@ export interface LeadSearchFilters {
 
 export interface LeadSearchResult {
   items: Lead[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface TaskSearchFilters {
+  leadId?: string;
+  ownerId?: string;
+  status?: LeadTaskStatus;
+  statuses?: LeadTaskStatus[];
+  priority?: LeadTaskPriority;
+  priorities?: LeadTaskPriority[];
+  type?: LeadTaskType;
+  types?: LeadTaskType[];
+  from?: string;
+  to?: string;
+  overdue?: boolean;
+  dueToday?: boolean;
+  noDate?: boolean;
+  includeCompleted?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface TaskSearchResult {
+  items: LeadTaskView[];
   total: number;
   limit: number;
   offset: number;
@@ -192,6 +277,35 @@ export type UpdateLeadInput = Partial<Omit<CreateLeadInput, "name">> & {
   expectedVersion?: number;
 };
 
+export interface CreateLeadTaskInput {
+  leadId: string;
+  title: string;
+  description?: string | null;
+  type?: LeadTaskType;
+  priority?: LeadTaskPriority;
+  dueAt?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  allDay?: boolean;
+  ownerId?: string | null;
+  order?: number;
+}
+
+export interface UpdateLeadTaskInput {
+  title?: string;
+  description?: string | null;
+  type?: LeadTaskType;
+  status?: "TODO" | "DOING";
+  priority?: LeadTaskPriority;
+  dueAt?: string | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  allDay?: boolean;
+  ownerId?: string | null;
+  order?: number;
+  expectedVersion?: number;
+}
+
 export interface DashboardSummary {
   activeLeads: number;
   overdueActions: number;
@@ -199,6 +313,9 @@ export interface DashboardSummary {
   openProposals: number;
   negotiation: number;
   won: number;
+  tasksToday: number;
+  overdueTasks: number;
+  meetingsToday: number;
   countsByStatus: Partial<Record<LeadStatus, number>>;
   needsAttention: Lead[];
 }

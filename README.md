@@ -12,6 +12,10 @@ Mini CRM interno **agent-first** para uma agência de sites, landing pages, auto
 - Detalhe do lead com oportunidade, score, contatos, presença digital, evidências e timeline.
 - Kanban com drag-and-drop e agrupamento dos estados canônicos.
 - `Needs Action`: overdue, hoje, sem próxima ação e próximos.
+- Tasks por lead com status, prioridade, responsável, data/hora e eventos com duração.
+- Tela global `/tasks` com visões My Tasks, Today, Upcoming, Overdue, No Date e Completed.
+- Calendário `/calendar` com Month, Week e Agenda, criação contextual e drag-and-drop para reagendar.
+- `nextAction` derivada automaticamente da primeira task ativa, mantendo compatibilidade com o modelo legado.
 - Notas, registro de contato, próxima ação e movimentação de estágio.
 - Regra `DO_NOT_CONTACT` aplicada na camada de domínio.
 - Versionamento otimista por `version`/`expectedVersion`.
@@ -22,7 +26,7 @@ Mini CRM interno **agent-first** para uma agência de sites, landing pages, auto
 - Data driver `mock` para execução rápida.
 - Data driver PostgreSQL via Drizzle ORM.
 - Docker Compose para PostgreSQL.
-- Seed com 25 empresas fictícias brasileiras.
+- Seed com 25 empresas fictícias brasileiras e tasks comerciais demonstrativas.
 - Remote MCP com Streamable HTTP.
 - MCP auth por token para desenvolvimento e validação OAuth/JWT para produção.
 - Metadata de protected resource OAuth.
@@ -72,7 +76,7 @@ npm run db:seed
 npm run dev
 ```
 
-`drizzle/0000_initial.sql` também contém o schema SQL inicial para revisão/execução manual.
+`drizzle/0000_initial.sql` contém o schema inicial e `drizzle/0001_lead_tasks_calendar.sql` adiciona Tasks/Calendar com migração idempotente de `next_action` legado.
 
 ## Autenticação do app
 
@@ -155,6 +159,18 @@ Escrita:
 - `lead_set_next_action`
 - `lead_record_contact`
 - `lead_mark_outcome`
+- `lead_task_create`
+- `lead_task_update`
+- `lead_task_complete`
+- `lead_task_cancel`
+- `lead_task_reschedule`
+- `lead_tasks_reorder`
+
+Leitura adicional:
+
+- `lead_tasks_list`
+- `lead_task_get`
+- `calendar_list`
 
 Não existe ferramenta `execute_sql`, `raw_query` ou equivalente.
 
@@ -193,6 +209,9 @@ O Kanban agrupa esses estados em uma interface menor: Inbox, Contato, Qualificad
 6. Writes podem usar `expectedVersion`; conflito retorna `VERSION_CONFLICT`.
 7. Deduplicação forte usa website/telefone/e-mail. Nome + cidade ambíguo não é fundido automaticamente no upsert.
 8. Leads ativos sem próxima ação são destacados em `Needs Action`.
+9. Tasks de contato (`CALL`, `FOLLOW_UP`, `MEETING`) são bloqueadas para `DO_NOT_CONTACT`.
+10. Datas são persistidas em UTC; as visões operacionais usam `America/Sao_Paulo` como timezone padrão.
+11. Tasks concluídas/canceladas são terminais; reagendamento usa optimistic concurrency por `version`.
 
 ## Estrutura
 
@@ -206,7 +225,7 @@ src/
   lib/
     auth/               # app + MCP auth
     db/                 # Drizzle schema/client
-    domain/             # tipos, estados, erros
+    domain/             # tipos, estados, tasks, timezone, erros
     mcp/                # tools MCP
     mock/               # dataset de demonstração
     repositories/       # adapters mock/postgres
@@ -232,6 +251,17 @@ POST   /api/leads/:id/evidence
 POST   /api/leads/:id/next-action
 POST   /api/leads/:id/contact
 POST   /api/leads/:id/outcome
+GET    /api/leads/:id/tasks
+POST   /api/leads/:id/tasks
+GET    /api/tasks
+POST   /api/tasks
+GET    /api/tasks/:id
+PATCH  /api/tasks/:id
+POST   /api/tasks/:id/complete
+POST   /api/tasks/:id/cancel
+POST   /api/tasks/:id/reschedule
+POST   /api/tasks/reorder
+GET    /api/calendar
 GET    /api/dashboard
 GET    /api/health
 ```
@@ -257,3 +287,8 @@ Antes de publicar:
 6. gere migrations versionadas a partir do schema Drizzle;
 7. faça backup do PostgreSQL;
 8. aplique rate limiting/WAF no `/mcp` e APIs se expostos publicamente.
+
+
+## Feature spec
+
+A especificação detalhada de Tasks + Calendar está em `docs/FEATURE-LEAD-TASKS-CALENDAR.md`.

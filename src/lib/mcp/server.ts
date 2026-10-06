@@ -1,6 +1,6 @@
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, type ActorContext, type LeadStatus } from "@/lib/domain/types";
+import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, LEAD_TASK_PRIORITIES, LEAD_TASK_STATUSES, LEAD_TASK_TYPES, type ActorContext, type LeadStatus } from "@/lib/domain/types";
 import { requireScope } from "@/lib/auth/mcp-auth";
 import {
   addLeadEvidence,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/services/leads";
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { PIPELINE_GROUPS } from "@/lib/domain/status";
+import { cancelTask, completeTask, createTask, getTask, listCalendar, listTasks, reorderTasks, rescheduleTask, updateTask } from "@/lib/services/tasks";
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -168,6 +169,52 @@ export function buildMcpServer(actor: ActorContext) {
     requireScope(actor, "leads.write");
     return textResult(await markOutcome(leadId, input, actor, "lead_mark_outcome"));
   });
+
+
+  server.registerTool("lead_tasks_list", {
+    title: "List lead tasks", description: "List CRM tasks with lead, owner, status, priority, type and date filters.", annotations: readAnnotations,
+    inputSchema: z.object({ leadId: z.string().uuid().optional(), ownerId: z.string().uuid().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional(), priorities: z.array(z.enum(LEAD_TASK_PRIORITIES)).optional(), types: z.array(z.enum(LEAD_TASK_TYPES)).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional(), overdue: z.boolean().optional(), dueToday: z.boolean().optional(), noDate: z.boolean().optional(), includeCompleted: z.boolean().optional(), limit: z.number().int().min(1).max(500).default(50), offset: z.number().int().min(0).default(0) }),
+  }, async (args) => { requireScope(actor, "leads.read"); return textResult(await listTasks(args)); });
+
+  server.registerTool("lead_task_get", {
+    title: "Get lead task", description: "Get one lead task with lead context and version.", annotations: readAnnotations,
+    inputSchema: z.object({ taskId: z.string().uuid() }),
+  }, async ({ taskId }) => { requireScope(actor, "leads.read"); return textResult(await getTask(taskId)); });
+
+  server.registerTool("lead_task_create", {
+    title: "Create lead task", description: "Create a task, call, follow-up, meeting, research or proposal task for a lead.", annotations: writeAnnotations,
+    inputSchema: z.object({ leadId: z.string().uuid(), title: z.string().min(1).max(300), description: z.string().max(5000).nullable().optional(), type: z.enum(LEAD_TASK_TYPES).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), dueAt: z.string().datetime().nullable().optional(), startAt: z.string().datetime().nullable().optional(), endAt: z.string().datetime().nullable().optional(), allDay: z.boolean().optional(), ownerId: z.string().uuid().nullable().optional(), order: z.number().int().optional() }),
+  }, async (input) => { requireScope(actor, "leads.write"); return textResult(await createTask(input, actor, "lead_task_create")); });
+
+  server.registerTool("lead_task_update", {
+    title: "Update lead task", description: "Update an active task. Supply expectedVersion when acting on a previously-read task.", annotations: writeAnnotations,
+    inputSchema: z.object({ taskId: z.string().uuid(), expectedVersion: z.number().int().positive().optional(), changes: z.object({ title: z.string().min(1).max(300).optional(), description: z.string().max(5000).nullable().optional(), type: z.enum(LEAD_TASK_TYPES).optional(), status: z.enum(["TODO", "DOING"]).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), dueAt: z.string().datetime().nullable().optional(), startAt: z.string().datetime().nullable().optional(), endAt: z.string().datetime().nullable().optional(), allDay: z.boolean().optional(), ownerId: z.string().uuid().nullable().optional(), order: z.number().int().optional() }) }),
+  }, async ({ taskId, expectedVersion, changes }) => { requireScope(actor, "leads.write"); return textResult(await updateTask(taskId, { ...changes, expectedVersion }, actor, "lead_task_update")); });
+
+  server.registerTool("lead_task_complete", {
+    title: "Complete lead task", description: "Complete an active task and recalculate the lead next action.", annotations: writeAnnotations,
+    inputSchema: z.object({ taskId: z.string().uuid(), expectedVersion: z.number().int().positive().optional() }),
+  }, async ({ taskId, expectedVersion }) => { requireScope(actor, "leads.write"); return textResult(await completeTask(taskId, actor, expectedVersion, "lead_task_complete")); });
+
+  server.registerTool("lead_task_cancel", {
+    title: "Cancel lead task", description: "Cancel an active task while preserving timeline and audit history.", annotations: writeAnnotations,
+    inputSchema: z.object({ taskId: z.string().uuid(), reason: z.string().max(1000).optional(), expectedVersion: z.number().int().positive().optional() }),
+  }, async ({ taskId, reason, expectedVersion }) => { requireScope(actor, "leads.write"); return textResult(await cancelTask(taskId, actor, { reason, expectedVersion }, "lead_task_cancel")); });
+
+  server.registerTool("lead_task_reschedule", {
+    title: "Reschedule lead task", description: "Change a task deadline or event start/end. DO_NOT_CONTACT guards apply to contact tasks.", annotations: writeAnnotations,
+    inputSchema: z.object({ taskId: z.string().uuid(), dueAt: z.string().datetime().nullable().optional(), startAt: z.string().datetime().nullable().optional(), endAt: z.string().datetime().nullable().optional(), allDay: z.boolean().optional(), expectedVersion: z.number().int().positive().optional() }),
+  }, async ({ taskId, ...input }) => { requireScope(actor, "leads.write"); return textResult(await rescheduleTask(taskId, input, actor, "lead_task_reschedule")); });
+
+  server.registerTool("lead_tasks_reorder", {
+    title: "Reorder lead tasks", description: "Set explicit order values for lead tasks.", annotations: writeAnnotations,
+    inputSchema: z.object({ items: z.array(z.object({ taskId: z.string().uuid(), order: z.number().int(), expectedVersion: z.number().int().positive().optional() })).min(1).max(100) }),
+  }, async ({ items }) => { requireScope(actor, "leads.write"); return textResult({ items: await reorderTasks(items, actor, "lead_tasks_reorder") }); });
+
+  server.registerTool("calendar_list", {
+    title: "List CRM calendar", description: "List scheduled CRM tasks in a bounded date range.", annotations: readAnnotations,
+    inputSchema: z.object({ from: z.string().datetime(), to: z.string().datetime(), ownerId: z.string().uuid().optional(), leadId: z.string().uuid().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional() }),
+  }, async (input) => { requireScope(actor, "leads.read"); return textResult(await listCalendar(input)); });
 
   return server;
 }

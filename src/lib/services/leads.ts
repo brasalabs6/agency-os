@@ -8,7 +8,8 @@ import type {
   LeadStatus,
   UpdateLeadInput,
 } from "@/lib/domain/types";
-import { getLeadRepository } from "@/lib/repositories";
+import { getLeadRepository, getTaskRepository } from "@/lib/repositories";
+import { cancelContactTasksForLead, createTask } from "./tasks";
 
 const repo = () => getLeadRepository();
 
@@ -30,8 +31,8 @@ export async function searchLeads(filters: LeadSearchFilters) {
 
 export async function getLead(id: string) {
   const lead = await mustGetLead(id);
-  const [activities, evidence] = await Promise.all([repo().listActivities(id), repo().listEvidence(id)]);
-  return { lead, activities, evidence };
+  const [activities, evidence, tasks] = await Promise.all([repo().listActivities(id), repo().listEvidence(id), getTaskRepository().search({ leadId: id, includeCompleted: true, limit: 100 })]);
+  return { lead, activities, evidence, tasks: tasks.items };
 }
 
 export async function listActivities(id: string, limit = 100) {
@@ -123,6 +124,7 @@ export async function moveLeadStage(id: string, targetStatus: LeadStatus, actor:
     metadata: { from: before.status, to: targetStatus, reason: opts?.reason ?? null },
   });
   await repo().addAudit({ actor, tool: opts?.tool, action: "lead.move_stage", leadId: id, input: { targetStatus, reason: opts?.reason }, result: { version: updated.version } });
+  if (targetStatus === "DO_NOT_CONTACT") { await cancelContactTasksForLead(id, actor, opts?.tool); return mustGetLead(id); }
   return updated;
 }
 
@@ -146,34 +148,28 @@ export async function setNextAction(id: string, input: { action: string; dueAt?:
   if (!isActiveStatus(lead.status) && !["WON", "ONBOARDING", "NURTURE"].includes(lead.status)) {
     throw new DomainError("Next action cannot be set for this lead status", "NEXT_ACTION_NOT_ALLOWED", 422);
   }
-  const updated = ensureVersion(await repo().update(id, { nextAction: input.action, nextActionAt: input.dueAt ?? null, nextActionOwnerId: input.ownerId ?? lead.owner?.id ?? null, expectedVersion: input.expectedVersion }), input.expectedVersion);
-  await repo().addActivity({ leadId: id, type: "NEXT_ACTION_SET", actor, summary: `Próxima ação: ${input.action}`, metadata: { dueAt: input.dueAt ?? null, ownerId: input.ownerId ?? null } });
-  await repo().addAudit({ actor, tool, action: "lead.set_next_action", leadId: id, input, result: { version: updated.version } });
-  return updated;
+  if (input.expectedVersion != null && input.expectedVersion !== lead.version) throw new DomainError("Lead changed since it was read. Reload before writing again.", "VERSION_CONFLICT", 409);
+  await createTask({ leadId: id, title: input.action, type: "TASK", priority: "MEDIUM", dueAt: input.dueAt ?? null, ownerId: input.ownerId ?? lead.owner?.id ?? null }, actor, tool ?? "lead_set_next_action");
+  return mustGetLead(id);
 }
 
 export async function recordContact(id: string, input: { channel: string; outcome: string; summary: string; contactedAt?: string; nextAction?: string | null; nextActionAt?: string | null; expectedVersion?: number }, actor: ActorContext, tool?: string) {
   const lead = await mustGetLead(id);
   if (!canContact(lead.status, lead.doNotContact)) throw new DomainError("This lead cannot be contacted", "DO_NOT_CONTACT", 403);
   const shouldMoveToContacted = ["DISCOVERED", "ENRICHED", "SCORED", "READY_TO_CONTACT"].includes(lead.status);
-  const patch: UpdateLeadInput = { expectedVersion: input.expectedVersion };
-  if (shouldMoveToContacted) patch.status = "CONTACTED";
-  if (input.nextAction) {
-    patch.nextAction = input.nextAction;
-    patch.nextActionAt = input.nextActionAt ?? null;
-    patch.nextActionOwnerId = lead.owner?.id ?? null;
-  }
-  const shouldUpdateLead = shouldMoveToContacted || Boolean(input.nextAction);
-  const updated = shouldUpdateLead ? ensureVersion(await repo().update(id, patch), input.expectedVersion) : lead;
+  let updated = lead;
   if (shouldMoveToContacted) {
+    updated = ensureVersion(await repo().update(id, { status: "CONTACTED", expectedVersion: input.expectedVersion }), input.expectedVersion);
     await repo().addActivity({ leadId: id, type: "STAGE_CHANGED", actor, summary: `Estágio alterado de ${lead.status} para CONTACTED após registro de contato.`, metadata: { from: lead.status, to: "CONTACTED" } });
+  } else if (input.expectedVersion != null && input.expectedVersion !== lead.version) {
+    throw new DomainError("Lead changed since it was read. Reload before writing again.", "VERSION_CONFLICT", 409);
   }
-  await repo().addActivity({
-    leadId: id, type: "CONTACT_RECORDED", actor,
-    summary: input.summary,
-    metadata: { channel: input.channel, outcome: input.outcome, contactedAt: input.contactedAt ?? new Date().toISOString(), nextAction: input.nextAction ?? null, nextActionAt: input.nextActionAt ?? null },
-  });
+  await repo().addActivity({ leadId: id, type: "CONTACT_RECORDED", actor, summary: input.summary, metadata: { channel: input.channel, outcome: input.outcome, contactedAt: input.contactedAt ?? new Date().toISOString(), nextAction: input.nextAction ?? null, nextActionAt: input.nextActionAt ?? null } });
   await repo().addAudit({ actor, tool, action: "lead.record_contact", leadId: id, input, result: { version: updated.version, stageMoved: shouldMoveToContacted } });
+  if (input.nextAction) {
+    await createTask({ leadId: id, title: input.nextAction, type: input.channel === "MEETING" ? "MEETING" : "FOLLOW_UP", priority: "MEDIUM", dueAt: input.nextActionAt ?? null, ownerId: lead.owner?.id ?? null }, actor, tool ?? "lead_record_contact");
+    updated = await mustGetLead(id);
+  }
   return updated;
 }
 

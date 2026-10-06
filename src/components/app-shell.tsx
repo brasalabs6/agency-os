@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Activity, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
+import { Activity, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
 const nav = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare2 },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/actions", label: "Needs Action", icon: ListTodo },
 ];
 
@@ -18,7 +20,7 @@ export function AppShell({ children, actorName }: { children: React.ReactNode; a
       <div className="flex items-center justify-between border-t border-default px-3 py-3"><div className="min-w-0"><div className="truncate text-xs font-medium">{actorName}</div><div className="text-[10px] text-muted">Internal workspace</div></div><ThemeToggle/></div>
     </aside>
     <div className="min-w-0">
-      <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-default bg-[color:var(--bg)]/90 px-4 backdrop-blur md:hidden"><Link href="/" className="font-semibold">AgencyOS</Link><div className="flex gap-4 text-xs"><Link href="/leads">Leads</Link><Link href="/pipeline">Pipeline</Link></div><ThemeToggle/></header>
+      <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-default bg-[color:var(--bg)]/90 px-4 backdrop-blur md:hidden"><Link href="/" className="font-semibold">AgencyOS</Link><div className="flex gap-3 text-xs"><Link href="/leads">Leads</Link><Link href="/tasks">Tasks</Link><Link href="/calendar">Calendar</Link></div><ThemeToggle/></header>
       <main className="mx-auto w-full max-w-[1600px] p-4 md:p-7">{children}</main>
     </div>
   </div>;

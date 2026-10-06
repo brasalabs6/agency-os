@@ -1,5 +1,6 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import type { ActivityType, ActorType, LeadStatus, ServiceOpportunity, UserRole } from "@/lib/domain/types";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import type { ActivityType, ActorType, LeadStatus, LeadTaskPriority, LeadTaskStatus, LeadTaskType, ServiceOpportunity, UserRole } from "@/lib/domain/types";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -100,4 +101,44 @@ export const auditLogs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("audit_logs_lead_idx").on(table.leadId), index("audit_logs_created_idx").on(table.createdAt)],
+);
+
+export const leadTasks = pgTable(
+  "lead_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    type: text("type").$type<LeadTaskType>().notNull().default("TASK"),
+    status: text("status").$type<LeadTaskStatus>().notNull().default("TODO"),
+    priority: text("priority").$type<LeadTaskPriority>().notNull().default("MEDIUM"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    startAt: timestamp("start_at", { withTimezone: true }),
+    endAt: timestamp("end_at", { withTimezone: true }),
+    allDay: boolean("all_day").notNull().default(false),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdByType: text("created_by_type").$type<ActorType>().notNull(),
+    createdById: text("created_by_id"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("lead_tasks_lead_idx").on(table.leadId),
+    index("lead_tasks_status_idx").on(table.status),
+    index("lead_tasks_owner_idx").on(table.ownerId),
+    index("lead_tasks_due_idx").on(table.dueAt),
+    index("lead_tasks_start_idx").on(table.startAt),
+    index("lead_tasks_end_idx").on(table.endAt),
+    index("lead_tasks_owner_status_due_idx").on(table.ownerId, table.status, table.dueAt),
+    index("lead_tasks_lead_status_idx").on(table.leadId, table.status),
+    check("lead_tasks_event_pair", sql`(${table.startAt} IS NULL) = (${table.endAt} IS NULL)`),
+    check("lead_tasks_event_order", sql`${table.endAt} IS NULL OR ${table.endAt} >= ${table.startAt}`),
+    check("lead_tasks_done_completed", sql`${table.status} <> 'DONE' OR ${table.completedAt} IS NOT NULL`),
+    check("lead_tasks_canceled_at", sql`${table.status} <> 'CANCELED' OR ${table.canceledAt} IS NOT NULL`),
+  ],
 );
