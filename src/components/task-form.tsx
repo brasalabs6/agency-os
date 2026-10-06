@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LEAD_TASK_PRIORITIES, LEAD_TASK_TYPES, type Lead, type LeadTaskView, type UserSummary } from "@/lib/domain/types";
 import { DEFAULT_TIME_ZONE, zonedDateTimeToUtc } from "@/lib/domain/time";
 import { ModalShell } from "./modal-shell";
@@ -9,13 +9,31 @@ import { buttonPrimaryClass, buttonSecondaryClass, controlClass, textareaClass }
 
 type LeadOption = Pick<Lead, "id" | "name" | "status">;
 
+type TaskFormProps = {
+  open: boolean;
+  onClose: () => void;
+  onSaved: (task: LeadTaskView) => void;
+  leads: LeadOption[];
+  users: UserSummary[];
+  fixedLeadId?: string;
+  initialTask?: LeadTaskView | null;
+  defaultDate?: string | null;
+};
+
+type TaskFormContentProps = Omit<TaskFormProps, "open">;
+
 function toLocalInput(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: DEFAULT_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    timeZone: DEFAULT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
@@ -29,8 +47,17 @@ function isoOrNull(value: string) {
   return zonedDateTimeToUtc(Number(year), Number(month), Number(day), Number(hour), Number(minute), 0, DEFAULT_TIME_ZONE).toISOString();
 }
 
-export function TaskForm({
-  open,
+export function TaskForm({ open, ...props }: TaskFormProps) {
+  if (!open) return null;
+
+  const formKey = props.initialTask
+    ? `edit:${props.initialTask.id}:${props.initialTask.version}`
+    : `new:${props.fixedLeadId ?? "any"}:${props.defaultDate ?? "none"}:${props.leads[0]?.id ?? "none"}`;
+
+  return <TaskFormContent key={formKey} {...props}/>;
+}
+
+function TaskFormContent({
   onClose,
   onSaved,
   leads,
@@ -38,17 +65,10 @@ export function TaskForm({
   fixedLeadId,
   initialTask,
   defaultDate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSaved: (task: LeadTaskView) => void;
-  leads: LeadOption[];
-  users: UserSummary[];
-  fixedLeadId?: string;
-  initialTask?: LeadTaskView | null;
-  defaultDate?: string | null;
-}) {
+}: TaskFormContentProps) {
   const defaultLead = fixedLeadId ?? initialTask?.leadId ?? leads[0]?.id ?? "";
+  const initialMode = initialTask?.startAt ? "event" : initialTask?.dueAt || defaultDate ? "deadline" : "none";
+
   const [leadId, setLeadId] = useState(defaultLead);
   const [title, setTitle] = useState(initialTask?.title ?? "");
   const [description, setDescription] = useState(initialTask?.description ?? "");
@@ -56,7 +76,6 @@ export function TaskForm({
   const [priority, setPriority] = useState(initialTask?.priority ?? "MEDIUM");
   const [status, setStatus] = useState<"TODO" | "DOING">(initialTask?.status === "DOING" ? "DOING" : "TODO");
   const [ownerId, setOwnerId] = useState(initialTask?.owner?.id ?? "");
-  const initialMode = initialTask?.startAt ? "event" : initialTask?.dueAt || defaultDate ? "deadline" : "none";
   const [scheduleMode, setScheduleMode] = useState<"none" | "deadline" | "event">(initialMode);
   const [dueAt, setDueAt] = useState(toLocalInput(initialTask?.dueAt ?? defaultDate));
   const [startAt, setStartAt] = useState(toLocalInput(initialTask?.startAt ?? (initialMode === "event" ? defaultDate : null)));
@@ -64,24 +83,6 @@ export function TaskForm({
   const [allDay, setAllDay] = useState(initialTask?.allDay ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const mode = initialTask?.startAt ? "event" : initialTask?.dueAt || defaultDate ? "deadline" : "none";
-    setLeadId(fixedLeadId ?? initialTask?.leadId ?? leads[0]?.id ?? "");
-    setTitle(initialTask?.title ?? "");
-    setDescription(initialTask?.description ?? "");
-    setType(initialTask?.type ?? "TASK");
-    setPriority(initialTask?.priority ?? "MEDIUM");
-    setStatus(initialTask?.status === "DOING" ? "DOING" : "TODO");
-    setOwnerId(initialTask?.owner?.id ?? "");
-    setScheduleMode(mode);
-    setDueAt(toLocalInput(initialTask?.dueAt ?? defaultDate));
-    setStartAt(toLocalInput(initialTask?.startAt ?? (mode === "event" ? defaultDate : null)));
-    setEndAt(toLocalInput(initialTask?.endAt));
-    setAllDay(initialTask?.allDay ?? false);
-    setError(null);
-  }, [open, fixedLeadId, initialTask, defaultDate, leads]);
 
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === leadId), [leads, leadId]);
 
@@ -92,6 +93,7 @@ export function TaskForm({
     try {
       if (!leadId) throw new Error("Selecione um lead.");
       if (scheduleMode === "event" && (!startAt || !endAt)) throw new Error("Eventos precisam de início e fim.");
+
       const payload = {
         ...(initialTask ? {} : { leadId }),
         title: title.trim(),
@@ -106,6 +108,7 @@ export function TaskForm({
         allDay,
         ...(initialTask ? { expectedVersion: initialTask.version } : {}),
       };
+
       const response = await fetch(initialTask ? `/api/tasks/${initialTask.id}` : "/api/tasks", {
         method: initialTask ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
@@ -122,7 +125,7 @@ export function TaskForm({
     }
   }
 
-  return <ModalShell open={open} onClose={onClose} title={initialTask ? "Editar tarefa" : "Nova tarefa"} description={selectedLead ? selectedLead.name : "Vincule a tarefa a um lead"} sizeClass="sm:max-w-2xl">
+  return <ModalShell open onClose={onClose} title={initialTask ? "Editar tarefa" : "Nova tarefa"} description={selectedLead ? selectedLead.name : "Vincule a tarefa a um lead"} sizeClass="sm:max-w-2xl">
     <form onSubmit={submit}>
       <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
         {!fixedLeadId ? <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Lead</span><select value={leadId} onChange={(event) => setLeadId(event.target.value)} className={controlClass} required>{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>)}</select></label> : null}
@@ -135,7 +138,7 @@ export function TaskForm({
         {scheduleMode === "deadline" ? <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Data e hora limite</span><input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} className={controlClass} required/></label> : null}
         {scheduleMode === "event" ? <><label><span className="mb-1.5 block text-xs font-medium">Início</span><input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} className={controlClass} required/></label><label><span className="mb-1.5 block text-xs font-medium">Fim</span><input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} className={controlClass} required/></label></> : null}
         {scheduleMode !== "none" ? <label className="flex items-center gap-2 text-xs text-muted sm:col-span-2"><input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)}/> Evento de dia inteiro</label> : null}
-        <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Descrição</span><textarea value={description ?? ""} onChange={(event) => setDescription(event.target.value)} className={`${textareaClass} min-h-24`} maxLength={5000}/></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Descrição</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} className={`${textareaClass} min-h-24`} maxLength={5000}/></label>
         {error ? <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</div> : null}
       </div>
       <div className="flex flex-col-reverse gap-2 border-t border-default px-4 py-4 sm:flex-row sm:justify-end sm:px-5"><button type="button" onClick={onClose} className={buttonSecondaryClass}>Cancelar</button><button disabled={saving} className={buttonPrimaryClass}>{saving ? "Salvando…" : initialTask ? "Salvar alterações" : "Criar tarefa"}</button></div>

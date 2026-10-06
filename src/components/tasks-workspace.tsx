@@ -27,10 +27,11 @@ export function TasksWorkspace({ tasks: initialTasks, leads, users, currentUserI
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<LeadTaskView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const now = new Date();
-  const nextWeek = new Date(now); nextWeek.setDate(nextWeek.getDate() + 7);
-
-  const filtered = useMemo(() => tasks.filter((task) => {
+  const filtered = useMemo(() => {
+    const now = new Date();
+    const nextWeek = new Date(now);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return tasks.filter((task) => {
     const active = task.status === "TODO" || task.status === "DOING";
     const date = effectiveTaskDate(task);
     if (view === "my" && task.owner?.id !== currentUserId) return false;
@@ -45,8 +46,9 @@ export function TasksWorkspace({ tasks: initialTasks, leads, users, currentUserI
       const q = query.toLowerCase();
       if (!`${task.title} ${task.lead.name} ${task.type}`.toLowerCase().includes(q)) return false;
     }
-    return true;
-  }).sort((a, b) => (effectiveTaskDate(a) ?? "9999").localeCompare(effectiveTaskDate(b) ?? "9999") || a.order - b.order), [tasks, view, priority, ownerId, query, currentUserId, now, nextWeek]);
+      return true;
+    }).sort((a, b) => (effectiveTaskDate(a) ?? "9999").localeCompare(effectiveTaskDate(b) ?? "9999") || a.order - b.order);
+  }, [tasks, view, priority, ownerId, query, currentUserId]);
 
   function upsert(task: LeadTaskView) {
     setTasks((current) => current.some((item) => item.id === task.id) ? current.map((item) => item.id === task.id ? task : item) : [...current, task]);

@@ -16,9 +16,6 @@ export function ModalShell({ open, onClose, title, description, children, sizeCl
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -31,7 +28,7 @@ export function ModalShell({ open, onClose, title, description, children, sizeCl
     };
     window.setTimeout(() => focusables()[0]?.focus(), 0);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onCloseRef.current(); return; }
+      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
       if (event.key !== "Tab") return;
       const items = focusables();
       if (!items.length) return;
@@ -42,7 +39,7 @@ export function ModalShell({ open, onClose, title, description, children, sizeCl
     };
     document.addEventListener("keydown", onKeyDown);
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener("keydown", onKeyDown); previouslyFocused?.focus(); };
-  }, [open]);
+  }, [open, onClose]);
 
   if (!open) return null;
   return <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>

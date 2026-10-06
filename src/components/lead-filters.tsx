@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { LEAD_STATUSES, SERVICE_OPPORTUNITIES } from "@/lib/domain/types";
 import { STATUS_LABELS } from "@/lib/domain/status";
@@ -33,7 +34,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
       <select aria-label="Filtrar por estágio" name="status" defaultValue={values.status ?? ""} className={controlClass}><option value="">Todos os estágios</option>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
       <select aria-label="Filtrar por responsável" name="owner" defaultValue={values.owner ?? ""} className={controlClass}><option value="">Todos os responsáveis</option><option value="me">Eu</option><option value="unassigned">Sem responsável</option>{users.map((user) => <option key={user.id} value={user.id}>{user.id === currentUserId ? `${user.name} (eu)` : user.name}</option>)}</select>
       <button className={buttonPrimaryClass}>Aplicar</button>
-      <a href="/leads" className={buttonGhostClass}>Limpar</a>
+      <Link href="/leads" className={buttonGhostClass}>Limpar</Link>
     </div>
 
     <details open={advancedActive} className="group rounded-xl border border-default bg-[var(--panel)]">
@@ -47,6 +48,6 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
       </div>
     </details>
 
-    {chips.length ? <div className="flex flex-wrap items-center gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-muted">Filtros ativos</span>{chips.map(([label, value]) => <span key={`${label}-${value}`} className="inline-flex items-center gap-1.5 rounded-full border border-default bg-[var(--panel)] px-2.5 py-1 text-xs"><span className="text-muted">{label}:</span>{value}</span>)}<a href="/leads" className={`${buttonSecondaryClass} min-h-8 px-2.5 text-xs`}><X size={12}/>Limpar todos</a></div> : null}
+    {chips.length ? <div className="flex flex-wrap items-center gap-2"><span className="text-[11px] font-medium uppercase tracking-wide text-muted">Filtros ativos</span>{chips.map(([label, value]) => <span key={`${label}-${value}`} className="inline-flex items-center gap-1.5 rounded-full border border-default bg-[var(--panel)] px-2.5 py-1 text-xs"><span className="text-muted">{label}:</span>{value}</span>)}<Link href="/leads" className={`${buttonSecondaryClass} min-h-8 px-2.5 text-xs`}><X size={12}/>Limpar todos</Link></div> : null}
   </form>;
 }

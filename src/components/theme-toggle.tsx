@@ -7,7 +7,9 @@ export function ThemeToggle() {
   useEffect(() => {
     const saved = localStorage.getItem("agencyos-theme");
     const enabled = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", enabled); setDark(enabled);
+    document.documentElement.classList.toggle("dark", enabled);
+    const frame = window.requestAnimationFrame(() => setDark(enabled));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
   function toggle() {
     const next = !dark; setDark(next); document.documentElement.classList.toggle("dark", next); localStorage.setItem("agencyos-theme", next ? "dark" : "light");

@@ -10,6 +10,7 @@ export default async function SettingsPage(){
   return <>
     <PageHeader title="Configurações" description="Configuração administrativa do AgencyOS."/>
     <div className="grid gap-4 lg:grid-cols-2">
+      <Card icon={<Bot size={17}/>} title="ChatGPT"><p className="text-sm">Cada usuário possui suas próprias credenciais MCP.</p><Link href="/settings/mcp" className="mt-3 inline-block rounded-md text-xs font-medium text-[var(--accent)] hover:underline">Gerenciar minha conexão</Link></Card>
       <Card icon={<Users size={17}/>} title="Equipe"><p className="text-sm">Logins individuais com funções de administrador e membro.</p><Link href="/settings/team" className="mt-3 inline-block rounded-md text-xs font-medium text-[var(--accent)] hover:underline">Gerenciar equipe</Link></Card>
       <Card icon={<Database size={17}/>} title="Persistência"><p className="text-sm">Modo atual: <strong>{mode}</strong></p><p className="mt-1 text-xs text-muted">Use PostgreSQL em produção. Mock é destinado ao desenvolvimento.</p></Card>
       <Card icon={<Server size={17}/>} title="MCP remoto"><p className="text-sm">Endpoint: <code>/mcp</code></p><p className="mt-1 text-xs text-muted">O MCP usa autenticação própria e converge no mesmo domínio.</p></Card>
