@@ -14,10 +14,8 @@ async function userMap(): Promise<Map<string, UserSummary>> {
 }
 
 async function mapTask(row: TaskRow, people?: Map<string, UserSummary>): Promise<LeadTaskView> {
-  const [leadRows, map] = await Promise.all([
-    getDb().select({ id: leads.id, name: leads.name, status: leads.status, score: leads.score }).from(leads).where(eq(leads.id, row.leadId)).limit(1),
-    people ? Promise.resolve(people) : userMap(),
-  ]);
+  const leadRows = await getDb().select({ id: leads.id, name: leads.name, status: leads.status, score: leads.score }).from(leads).where(eq(leads.id, row.leadId)).limit(1);
+  const map = people ?? await userMap();
   const lead = leadRows[0];
   if (!lead) throw new Error("Lead not found for task");
   return {
@@ -53,12 +51,12 @@ export class PostgresTaskRepository implements TaskRepository {
     if (filters.to) conditions.push(lte(effective, new Date(filters.to)));
     const where = conditions.length ? and(...conditions) : undefined;
     const limit = Math.min(filters.limit ?? 50, 500); const offset = filters.offset ?? 0; const db = getDb();
-    const [rows, countRows, people] = await Promise.all([
-      db.select().from(leadTasks).where(where).orderBy(asc(effective), asc(leadTasks.sortOrder)).limit(limit).offset(offset),
-      db.select({ count: sql<number>`count(*)::int` }).from(leadTasks).where(where),
-      userMap(),
-    ]);
-    return { items: await Promise.all(rows.map((row) => mapTask(row, people))), total: countRows[0]?.count ?? 0, limit, offset };
+    const rows = await db.select().from(leadTasks).where(where).orderBy(asc(effective), asc(leadTasks.sortOrder)).limit(limit).offset(offset);
+    const countRows = await db.select({ count: sql<number>`count(*)::int` }).from(leadTasks).where(where);
+    const people = await userMap();
+    const items: LeadTaskView[] = [];
+    for (const row of rows) items.push(await mapTask(row, people));
+    return { items, total: countRows[0]?.count ?? 0, limit, offset };
   }
 
   async getById(id: string) {
