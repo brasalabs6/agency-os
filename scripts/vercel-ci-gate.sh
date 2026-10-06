@@ -19,12 +19,22 @@ fi
 
 echo "Production branch detected. Waiting for GitHub Quality Gate on $SHA."
 
-for attempt in $(seq 1 60); do
+for attempt in $(seq 1 40); do
   payload="$(curl --fail --silent --show-error     -H "Accept: application/vnd.github+json"     -H "X-GitHub-Api-Version: 2022-11-28"     -H "User-Agent: agency-os-vercel-ci-gate"     "https://api.github.com/repos/$REPO/commits/$SHA/check-runs?per_page=100")"
 
-  successful="$(printf '%s' "$payload" | jq '[.check_runs[] | select(.name == "Quality Gate" and .conclusion == "success")] | length')"
-  running="$(printf '%s' "$payload" | jq '[.check_runs[] | select(.name == "Quality Gate" and (.status != "completed" or .conclusion == null))] | length')"
-  failed="$(printf '%s' "$payload" | jq '[.check_runs[] | select(.name == "Quality Gate" and .status == "completed" and (.conclusion != "success" and .conclusion != "skipped" and .conclusion != null))] | length')"
+  read -r successful running failed < <(
+    printf '%s' "$payload" | node -e '
+      let input = "";
+      process.stdin.on("data", (chunk) => input += chunk);
+      process.stdin.on("end", () => {
+        const runs = JSON.parse(input).check_runs.filter((run) => run.name === "Quality Gate");
+        const successful = runs.filter((run) => run.conclusion === "success").length;
+        const running = runs.filter((run) => run.status !== "completed" || run.conclusion == null).length;
+        const failed = runs.filter((run) => run.status === "completed" && run.conclusion && !["success", "skipped"].includes(run.conclusion)).length;
+        process.stdout.write(successful + " " + running + " " + failed);
+      });
+    '
+  )
 
   if [[ "$successful" -gt 0 ]]; then
     echo "Quality Gate passed. Proceeding with production build."
@@ -36,8 +46,8 @@ for attempt in $(seq 1 60); do
     exit 0
   fi
 
-  echo "Quality Gate not green yet (attempt $attempt/60)."
-  sleep 10
+  echo "Quality Gate not green yet (attempt $attempt/40)."
+  sleep 15
 done
 
 echo "Quality Gate did not become green within 10 minutes. Ignoring production deployment."
