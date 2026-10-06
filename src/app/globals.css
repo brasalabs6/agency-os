@@ -10,6 +10,7 @@
   --border-strong: #d6d6d0;
   --accent: #2563eb;
   --accent-soft: #eff6ff;
+  --accent-contrast: #ffffff;
   --danger: #b42318;
   --warning: #a15c00;
   --success: #137333;
@@ -26,6 +27,7 @@ html.dark {
   --border-strong: #3a3b38;
   --accent: #7da6ff;
   --accent-soft: #18233a;
+  --accent-contrast: #0d1422;
   --danger: #ff8a80;
   --warning: #f0b35b;
   --success: #6ecf85;
@@ -34,10 +36,11 @@ html.dark {
 
 * { box-sizing: border-box; }
 html { background: var(--bg); color: var(--text); }
-body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-feature-settings: "ss01" 1, "cv11" 1; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-feature-settings: "ss01" 1, "cv11" 1; -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+button:disabled { cursor: default; }
 ::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 
 .surface { background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); }
@@ -49,6 +52,7 @@ button { cursor: pointer; }
 .status-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; opacity: .8; }
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 
+.table-row { transition: background-color .12s ease; }
 .table-row:hover { background: var(--panel-2); }
 .kanban-card { transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
 .kanban-card:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--shadow); }
