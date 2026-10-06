@@ -39,7 +39,9 @@ export async function searchLeads(filters: LeadSearchFilters) {
 
 export async function getLead(id: string) {
   const lead = await mustGetLead(id);
-  const [activities, evidence, tasks] = await Promise.all([repo().listActivities(id), repo().listEvidence(id), getTaskRepository().search({ leadId: id, includeCompleted: true, limit: 100 })]);
+  const activities = await repo().listActivities(id);
+  const evidence = await repo().listEvidence(id);
+  const tasks = await getTaskRepository().search({ leadId: id, includeCompleted: true, limit: 100 });
   return { lead, activities, evidence, tasks: tasks.items };
 }
 
