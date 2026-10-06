@@ -1,0 +1,16 @@
+"use client";
+import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { SERVICE_OPPORTUNITIES } from "@/lib/domain/types";
+
+export function NewLeadButton() {
+  const router = useRouter(); const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(null); const data = new FormData(event.currentTarget);
+    const body = { name: data.get("name"), segment: data.get("segment") || null, city: data.get("city") || null, state: data.get("state") || null, website: data.get("website") || null, phone: data.get("phone") || null, email: data.get("email") || null, primaryOpportunity: data.get("opportunity") || null, tags: ["manual"] };
+    try { const response = await fetch("/api/leads", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const json = await response.json(); if (!response.ok) throw new Error(json?.error?.message ?? "Falha ao criar lead"); setOpen(false); router.push(`/leads/${json.id}`); router.refresh(); } catch (e) { setError(e instanceof Error ? e.message : "Erro"); } finally { setBusy(false); }
+  }
+  return <><button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-md bg-[var(--text)] px-3 py-2 text-xs font-medium text-[var(--panel)]"><Plus size={14}/>Novo lead</button>{open ? <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onMouseDown={(e) => { if (e.currentTarget === e.target) setOpen(false); }}><form onSubmit={submit} className="surface w-full max-w-xl rounded-xl p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-semibold">Novo lead</h2><button type="button" onClick={() => setOpen(false)} className="text-sm text-muted">Fechar</button></div><div className="grid gap-3 sm:grid-cols-2"><Field name="name" label="Empresa" required/><Field name="segment" label="Segmento"/><Field name="city" label="Cidade"/><Field name="state" label="UF"/><Field name="website" label="Website" type="url"/><Field name="phone" label="Telefone"/><Field name="email" label="Email" type="email"/><label className="text-xs font-medium">Oportunidade<select name="opportunity" className="mt-1 h-10 w-full rounded-md border border-default bg-[var(--panel)] px-2 text-sm"><option value="">—</option>{SERVICE_OPPORTUNITIES.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label></div>{error ? <p className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-300">{error}</p> : null}<div className="mt-5 flex justify-end"><button disabled={busy} className="rounded-md bg-[var(--text)] px-4 py-2 text-sm font-medium text-[var(--panel)] disabled:opacity-50">{busy ? "Criando…" : "Criar lead"}</button></div></form></div> : null}</>;
+}
+function Field({ name, label, type = "text", required = false }: { name: string; label: string; type?: string; required?: boolean }) { return <label className="text-xs font-medium">{label}<input name={name} type={type} required={required} className="mt-1 h-10 w-full rounded-md border border-default bg-[var(--panel)] px-3 text-sm"/></label>; }
