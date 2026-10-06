@@ -22,6 +22,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   if (values.owner === "me") filters.ownerId = currentUser.id;
   else if (values.owner === "unassigned") filters.ownerUnassigned = true;
   else if (values.owner) filters.ownerId = values.owner;
-  const [result, users] = await Promise.all([searchLeads(filters), listUsers()]);
+  const result = await searchLeads(filters);
+  const users = await listUsers();
   return <><PageHeader title="Leads" description={`${result.total} leads encontrados`} action={<NewLeadButton/>}/><LeadFilters values={values} users={users} currentUserId={currentUser.id}/><LeadTable leads={result.items}/></>;
 }
