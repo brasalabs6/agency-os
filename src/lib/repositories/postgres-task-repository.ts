@@ -42,13 +42,28 @@ export class PostgresTaskRepository implements TaskRepository {
     if (!filters.includeCompleted) conditions.push(inArray(leadTasks.status, ["TODO", "DOING"]));
     const effective = sql<Date>`coalesce(${leadTasks.dueAt}, ${leadTasks.startAt})`;
     if (filters.noDate) conditions.push(and(isNull(leadTasks.dueAt), isNull(leadTasks.startAt))!);
-    if (filters.overdue) conditions.push(and(inArray(leadTasks.status, ["TODO", "DOING"]), lt(effective, new Date()))!);
+    if (filters.overdue) {
+      const nowIso = new Date().toISOString();
+      conditions.push(and(inArray(leadTasks.status, ["TODO", "DOING"]), sql`${effective} < ${nowIso}::timestamptz`)!);
+    }
     if (filters.dueToday) {
       const { start, end } = dayRangeInTimeZone();
-      conditions.push(and(inArray(leadTasks.status, ["TODO", "DOING"]), gte(effective, start), lte(effective, end))!);
+      const startIso = start.toISOString();
+      const endIso = end.toISOString();
+      conditions.push(and(
+        inArray(leadTasks.status, ["TODO", "DOING"]),
+        sql`${effective} >= ${startIso}::timestamptz`,
+        sql`${effective} <= ${endIso}::timestamptz`,
+      )!);
     }
-    if (filters.from) conditions.push(gte(effective, new Date(filters.from)));
-    if (filters.to) conditions.push(lte(effective, new Date(filters.to)));
+    if (filters.from) {
+      const fromIso = new Date(filters.from).toISOString();
+      conditions.push(sql`${effective} >= ${fromIso}::timestamptz`);
+    }
+    if (filters.to) {
+      const toIso = new Date(filters.to).toISOString();
+      conditions.push(sql`${effective} <= ${toIso}::timestamptz`);
+    }
     const where = conditions.length ? and(...conditions) : undefined;
     const limit = Math.min(filters.limit ?? 50, 500); const offset = filters.offset ?? 0; const db = getDb();
     const rows = await db.select().from(leadTasks).where(where).orderBy(asc(effective), asc(leadTasks.sortOrder)).limit(limit).offset(offset);
