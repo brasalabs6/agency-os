@@ -24,7 +24,7 @@ function offsetAt(date: Date, timeZone: string) {
 export function zonedDateTimeToUtc(year: number, month: number, day: number, hour: number, minute: number, second: number, timeZone = DEFAULT_TIME_ZONE) {
   const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
   let guess = new Date(wallAsUtc);
-  let offset = offsetAt(guess, timeZone);
+  const offset = offsetAt(guess, timeZone);
   guess = new Date(wallAsUtc - offset);
   const correctedOffset = offsetAt(guess, timeZone);
   if (correctedOffset !== offset) guess = new Date(wallAsUtc - correctedOffset);

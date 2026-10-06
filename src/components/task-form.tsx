@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { LEAD_TASK_PRIORITIES, LEAD_TASK_TYPES, type Lead, type LeadTaskView, type UserSummary } from "@/lib/domain/types";
 import { DEFAULT_TIME_ZONE, zonedDateTimeToUtc } from "@/lib/domain/time";
@@ -28,16 +28,7 @@ function isoOrNull(value: string) {
   return zonedDateTimeToUtc(Number(year), Number(month), Number(day), Number(hour), Number(minute), 0, DEFAULT_TIME_ZONE).toISOString();
 }
 
-export function TaskForm({
-  open,
-  onClose,
-  onSaved,
-  leads,
-  users,
-  fixedLeadId,
-  initialTask,
-  defaultDate,
-}: {
+type TaskFormProps = {
   open: boolean;
   onClose: () => void;
   onSaved: (task: LeadTaskView) => void;
@@ -46,7 +37,37 @@ export function TaskForm({
   fixedLeadId?: string;
   initialTask?: LeadTaskView | null;
   defaultDate?: string | null;
-}) {
+};
+
+export function TaskForm(props: TaskFormProps) {
+  if (!props.open) return null;
+  const formKey = [
+    props.initialTask?.id ?? "new",
+    props.fixedLeadId ?? "",
+    props.defaultDate ?? "",
+    props.leads[0]?.id ?? "",
+  ].join(":");
+  return <TaskFormBody
+    key={formKey}
+    onClose={props.onClose}
+    onSaved={props.onSaved}
+    leads={props.leads}
+    users={props.users}
+    fixedLeadId={props.fixedLeadId}
+    initialTask={props.initialTask}
+    defaultDate={props.defaultDate}
+  />;
+}
+
+function TaskFormBody({
+  onClose,
+  onSaved,
+  leads,
+  users,
+  fixedLeadId,
+  initialTask,
+  defaultDate,
+}: Omit<TaskFormProps, "open">) {
   const defaultLead = fixedLeadId ?? initialTask?.leadId ?? leads[0]?.id ?? "";
   const [leadId, setLeadId] = useState(defaultLead);
   const [title, setTitle] = useState(initialTask?.title ?? "");
@@ -64,27 +85,7 @@ export function TaskForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const mode = initialTask?.startAt ? "event" : initialTask?.dueAt || defaultDate ? "deadline" : "none";
-    setLeadId(fixedLeadId ?? initialTask?.leadId ?? leads[0]?.id ?? "");
-    setTitle(initialTask?.title ?? "");
-    setDescription(initialTask?.description ?? "");
-    setType(initialTask?.type ?? "TASK");
-    setPriority(initialTask?.priority ?? "MEDIUM");
-    setStatus(initialTask?.status === "DOING" ? "DOING" : "TODO");
-    setOwnerId(initialTask?.owner?.id ?? "");
-    setScheduleMode(mode);
-    setDueAt(toLocalInput(initialTask?.dueAt ?? defaultDate));
-    setStartAt(toLocalInput(initialTask?.startAt ?? (mode === "event" ? defaultDate : null)));
-    setEndAt(toLocalInput(initialTask?.endAt));
-    setAllDay(initialTask?.allDay ?? false);
-    setError(null);
-  }, [open, fixedLeadId, initialTask, defaultDate, leads]);
-
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === leadId), [leads, leadId]);
-  if (!open) return null;
-
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true); setError(null);

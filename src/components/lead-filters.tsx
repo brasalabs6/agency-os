@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Search } from "lucide-react";
 import { LEAD_STATUSES, SERVICE_OPPORTUNITIES } from "@/lib/domain/types";
 import { STATUS_LABELS } from "@/lib/domain/status";
@@ -14,6 +15,6 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
     <input name="scoreMin" type="number" min="0" max="100" defaultValue={values.scoreMin} placeholder="Score mín." className="focus-ring h-9 rounded-md border border-default bg-[var(--panel)] px-2.5 text-sm"/>
     <select name="quick" defaultValue={values.quick ?? ""} className="focus-ring h-9 rounded-md border border-default bg-[var(--panel)] px-2.5 text-sm"><option value="">Visão</option><option value="high-score">High score</option><option value="today">Contato hoje</option><option value="overdue">Overdue</option><option value="no-action">Sem próxima ação</option><option value="proposal">Propostas</option><option value="negotiation">Negociação</option><option value="won">Ganhos</option></select>
     <button className="focus-ring h-9 rounded-md bg-[var(--text)] px-3 text-sm font-medium text-[var(--panel)]">Aplicar</button>
-    <a href="/leads" className="grid h-9 place-items-center rounded-md px-2.5 text-xs text-muted hover:bg-[var(--panel)]">Limpar</a>
+    <Link href="/leads" className="grid h-9 place-items-center rounded-md px-2.5 text-xs text-muted hover:bg-[var(--panel)]">Limpar</Link>
   </form>;
 }
