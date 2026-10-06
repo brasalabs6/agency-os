@@ -1,9 +1,13 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
+type AppDb = ReturnType<typeof drizzle<typeof schema>>;
+
 let client: ReturnType<typeof postgres> | null = null;
-let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let dbInstance: AppDb | null = null;
+const transactionContext = new AsyncLocalStorage<AppDb>();
 
 function runtimeDatabaseUrl(raw: string) {
   const url = new URL(raw);
@@ -21,7 +25,7 @@ function runtimeDatabaseUrl(raw: string) {
   return url.toString();
 }
 
-export function getDb() {
+function getRootDb(): AppDb {
   if (dbInstance) return dbInstance;
 
   const rawUrl = process.env.DATABASE_URL;
@@ -42,4 +46,15 @@ export function getDb() {
 
   dbInstance = drizzle(client, { schema });
   return dbInstance;
+}
+
+export function getDb(): AppDb {
+  return transactionContext.getStore() ?? getRootDb();
+}
+
+export async function withDbTransaction<T>(work: () => Promise<T>): Promise<T> {
+  if (transactionContext.getStore()) return work();
+
+  const db = getRootDb();
+  return db.transaction(async (tx) => transactionContext.run(tx as unknown as AppDb, work));
 }
