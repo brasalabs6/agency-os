@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { leadTasks, leads, users } from "@/lib/db/schema";
 import { dayRangeInTimeZone } from "@/lib/domain/time";
