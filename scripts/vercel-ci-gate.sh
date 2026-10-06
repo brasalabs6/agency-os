@@ -31,7 +31,7 @@ for attempt in $(seq 1 40); do
         const successful = runs.filter((run) => run.conclusion === "success").length;
         const running = runs.filter((run) => run.status !== "completed" || run.conclusion == null).length;
         const failed = runs.filter((run) => run.status === "completed" && run.conclusion && !["success", "skipped"].includes(run.conclusion)).length;
-        process.stdout.write(successful + " " + running + " " + failed);
+        console.log(successful + " " + running + " " + failed);
       });
     '
   )
