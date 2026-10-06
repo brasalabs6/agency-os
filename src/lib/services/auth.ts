@@ -46,7 +46,7 @@ export async function signIn(emailRaw: string, password: string, ip?: string | n
     !valid &&
     user?.active &&
     user.role === "ADMIN" &&
-    user.email === "guibelongtovi@gmail.com" &&
+    user.email === "admin@agency.local" &&
     !user.lastLoginAt &&
     process.env.APP_PASSWORD &&
     password === process.env.APP_PASSWORD
