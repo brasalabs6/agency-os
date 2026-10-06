@@ -7,8 +7,13 @@ import { StatusBadge } from "@/components/status-badge";
 import { DateLabel } from "@/components/date-label";
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { PIPELINE_GROUPS } from "@/lib/domain/status";
+import { requireCurrentUser } from "@/lib/auth/app-auth";
 
 export default async function OverviewPage() {
+  // Child server components may execute in parallel with the protected layout.
+  // Authenticate here before touching the database so unauthenticated requests
+  // cannot trigger dashboard queries while the layout is redirecting to /login.
+  await requireCurrentUser();
   const data = await getDashboardSummary();
   return <><PageHeader title="Overview" description="O que precisa avançar agora no pipeline."/><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8"><MetricCard label="Leads ativos" value={data.activeLeads}/><MetricCard label="Tasks hoje" value={data.tasksToday}/><MetricCard label="Vencidas" value={data.overdueTasks}/><MetricCard label="Contatos hoje" value={data.contactToday}/><MetricCard label="Reuniões hoje" value={data.meetingsToday}/><MetricCard label="Propostas" value={data.openProposals}/><MetricCard label="Negociação" value={data.negotiation}/><MetricCard label="Ganhos" value={data.won}/></div>
   <div className="mt-6 grid gap-5 xl:grid-cols-[1.25fr_.75fr]"><section className="surface-flat rounded-lg"><div className="flex items-center justify-between border-b border-default px-4 py-3"><div><h2 className="text-sm font-semibold">Needs attention</h2><p className="text-xs text-muted">Atrasos, ausência de próxima ação e leads prioritários.</p></div><Link href="/actions" className="flex items-center gap-1 text-xs text-muted hover:text-[var(--text)]">Ver tudo <ArrowRight size={13}/></Link></div><div className="divide-y divide-[var(--border)]">{data.needsAttention.map((lead) => <Link href={`/leads/${lead.id}`} key={lead.id} className="grid gap-3 px-4 py-3 hover:bg-[var(--panel-2)] sm:grid-cols-[1fr_auto_auto]"><div><div className="flex items-center gap-2"><span className="text-sm font-medium">{lead.name}</span>{!lead.nextAction ? <TriangleAlert size={13} className="text-amber-600"/> : null}</div><p className="mt-1 text-xs text-muted">{lead.nextAction ?? "Sem próxima ação definida"}</p></div><div className="flex items-center gap-2"><LeadScore score={lead.score}/><StatusBadge status={lead.status}/></div><div className="flex items-center gap-1"><Clock3 size={12} className="text-muted"/><DateLabel value={lead.nextActionAt} highlightOverdue/></div></Link>)}</div></section>
