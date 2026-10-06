@@ -5,7 +5,9 @@ import { listUsers, searchLeads } from "@/lib/services/leads";
 import type { LeadSearchFilters } from "@/lib/domain/types";
 
 export default async function PipelinePage({searchParams}:{searchParams:Promise<{owner?:string}>}) {
-  const [{owner}, currentUser, users] = await Promise.all([searchParams, requireCurrentUser(), listUsers()]);
+  const { owner } = await searchParams;
+  const currentUser = await requireCurrentUser();
+  const users = await listUsers();
   const filters: LeadSearchFilters = { limit: 100 };
   if (owner === "me") filters.ownerId = currentUser.id;
   else if (owner === "unassigned") filters.ownerUnassigned = true;
