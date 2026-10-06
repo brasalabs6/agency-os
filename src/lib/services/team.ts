@@ -4,6 +4,7 @@ import { normalizeEmail, publicUser } from "./auth";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import type { ActorContext, UserRole } from "@/lib/domain/types";
 import { getAuthRepository, getLeadRepository } from "@/lib/repositories";
+import { revokeAllMcpCredentialsForUser } from "./mcp-credentials";
 
 function adminActor(admin: AuthenticatedUser): ActorContext { return { type: "USER", id: admin.id, name: admin.name }; }
 export function assertAdmin(user: AuthenticatedUser) { if (user.role !== "ADMIN") throw new DomainError("Administrator access required", "ADMIN_REQUIRED", 403); }
@@ -49,6 +50,7 @@ export async function deactivateTeamMember(admin: AuthenticatedUser, id: string)
   const user = await getAuthRepository().updateUser(id, { active: false });
   if (!user) throw new DomainError("User not found", "USER_NOT_FOUND", 404);
   await getAuthRepository().revokeSessionsForUser(id);
+  await revokeAllMcpCredentialsForUser(id);
   await audit(admin, "USER_DEACTIVATED", { targetUserId: id });
   return publicUser(user);
 }

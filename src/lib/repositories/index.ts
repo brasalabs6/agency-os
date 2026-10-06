@@ -7,6 +7,9 @@ import { postgresTaskRepository } from "./postgres-task-repository";
 import type { AuthRepository } from "./auth-repository";
 import { mockAuthRepository } from "./mock-auth-repository";
 import { postgresAuthRepository } from "./postgres-auth-repository";
+import type { McpCredentialRepository } from "./mcp-credential-repository";
+import { mockMcpCredentialRepository } from "./mock-mcp-credential-repository";
+import { postgresMcpCredentialRepository } from "./postgres-mcp-credential-repository";
 
 function usePostgres(): boolean {
   const driver = process.env.DATA_DRIVER;
@@ -25,4 +28,8 @@ export function getTaskRepository(): TaskRepository {
 
 export function getAuthRepository(): AuthRepository {
   return usePostgres() ? postgresAuthRepository : mockAuthRepository;
+}
+
+export function getMcpCredentialRepository(): McpCredentialRepository {
+  return usePostgres() ? postgresMcpCredentialRepository : mockMcpCredentialRepository;
 }

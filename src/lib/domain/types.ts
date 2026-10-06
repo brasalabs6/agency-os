@@ -245,6 +245,10 @@ export interface ActorContext {
   name: string;
   scopes?: string[];
   role?: UserRole;
+  principalUserId?: string;
+  principalUserName?: string;
+  credentialId?: string;
+  credentialName?: string;
 }
 
 export interface CreateLeadInput {

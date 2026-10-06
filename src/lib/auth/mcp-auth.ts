@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { ActorContext } from "@/lib/domain/types";
 import { DomainError } from "@/lib/domain/errors";
+import { resolveMcpCredentialSecret } from "@/lib/services/mcp-credentials";
 
 function parseScopes(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
@@ -14,8 +15,28 @@ function requiredScopes(): string[] {
 
 export async function authorizeMcpRequest(request: Request): Promise<ActorContext> {
   const mode = process.env.MCP_AUTH_MODE ?? "token";
-  if (mode === "none" && process.env.NODE_ENV !== "production") {
+
+  if (mode === "none") {
+    if (process.env.NODE_ENV === "production") throw new DomainError("MCP no-auth mode is disabled in production", "MCP_AUTH_CONFIG_ERROR", 500);
     return { type: "AGENT", id: "mcp-dev", name: "MCP Dev Client", scopes: ["leads.read", "leads.write"] };
+  }
+
+  if (mode === "user_query_token") {
+    const secret = new URL(request.url).searchParams.get("key");
+    if (!secret) throw new DomainError("Invalid MCP credential", "MCP_CREDENTIAL_INVALID", 403);
+
+    const { credential, user } = await resolveMcpCredentialSecret(secret);
+    return {
+      type: "AGENT",
+      id: `mcp:${credential.id}`,
+      name: `ChatGPT · ${user.name}`,
+      scopes: credential.scopes,
+      role: user.role,
+      principalUserId: user.id,
+      principalUserName: user.name,
+      credentialId: credential.id,
+      credentialName: credential.name,
+    };
   }
 
   const auth = request.headers.get("authorization");

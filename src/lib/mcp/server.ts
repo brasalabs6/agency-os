@@ -2,6 +2,7 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, LEAD_TASK_PRIORITIES, LEAD_TASK_STATUSES, LEAD_TASK_TYPES, type ActorContext, type LeadStatus } from "@/lib/domain/types";
 import { requireScope } from "@/lib/auth/mcp-auth";
+import { DomainError } from "@/lib/domain/errors";
 import {
   addLeadEvidence,
   addLeadNote,
@@ -27,11 +28,34 @@ const textResult = (value: unknown) => ({
 const readAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const writeAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
 
+function principalUserId(actor: ActorContext) {
+  if (!actor.principalUserId) throw new DomainError("This MCP connection is not linked to an AgencyOS user", "MCP_PRINCIPAL_REQUIRED", 422);
+  return actor.principalUserId;
+}
+
+function assertOwnerSelectorConflict(explicitOwnerId: string | null | undefined, usePrincipal: boolean | undefined) {
+  if (explicitOwnerId && usePrincipal) throw new DomainError("Use either ownerId or mine/assignToMe, not both", "MCP_OWNER_SELECTOR_CONFLICT", 422);
+}
+
 export function buildMcpServer(actor: ActorContext) {
   const server = new McpServer(
     { name: "agencyos-leads", version: "0.1.0" },
     { capabilities: { tools: {} }, instructions: "Operate the AgencyOS lead pipeline. Respect DO_NOT_CONTACT, preserve source evidence, and always use domain tools instead of inventing facts." },
   );
+
+  server.registerTool("mcp_whoami", {
+    title: "Who am I",
+    description: "Return the authenticated MCP agent identity and, when available, the linked AgencyOS user. Secrets are never returned.",
+    annotations: readAnnotations,
+    inputSchema: z.object({}),
+  }, async () => {
+    return textResult({
+      agent: { id: actor.id, name: actor.name, type: actor.type },
+      user: actor.principalUserId ? { id: actor.principalUserId, name: actor.principalUserName ?? null, role: actor.role ?? null } : null,
+      credential: actor.credentialId ? { id: actor.credentialId, name: actor.credentialName ?? null } : null,
+      scopes: actor.scopes ?? [],
+    });
+  });
 
   server.registerTool("leads_search", {
     title: "Search leads",
@@ -42,13 +66,16 @@ export function buildMcpServer(actor: ActorContext) {
       status: z.enum(LEAD_STATUSES).optional(),
       pipelineGroup: z.enum(["inbox", "contact", "qualified", "diagnosis", "proposal", "negotiation", "won"]).optional(),
       segment: z.string().optional(), city: z.string().optional(), opportunity: z.enum(SERVICE_OPPORTUNITIES).optional(),
-      ownerId: z.string().uuid().optional(), scoreMin: z.number().int().min(0).max(100).optional(), scoreMax: z.number().int().min(0).max(100).optional(),
+      ownerId: z.string().uuid().optional(), mine: z.boolean().optional(), scoreMin: z.number().int().min(0).max(100).optional(), scoreMax: z.number().int().min(0).max(100).optional(),
       tags: z.array(z.string()).optional(), overdue: z.boolean().optional(), dueToday: z.boolean().optional(), noNextAction: z.boolean().optional(),
       limit: z.number().int().min(1).max(100).default(25), offset: z.number().int().min(0).default(0),
     }),
   }, async (args) => {
     requireScope(actor, "leads.read");
-    return textResult(await searchLeads(args));
+    assertOwnerSelectorConflict(args.ownerId, args.mine);
+    const { mine, ...filters } = args;
+    if (mine) filters.ownerId = principalUserId(actor);
+    return textResult(await searchLeads(filters));
   });
 
   server.registerTool("lead_get", {
@@ -142,9 +169,11 @@ export function buildMcpServer(actor: ActorContext) {
   server.registerTool("lead_set_next_action", {
     title: "Set next action",
     description: "Set the explicit next step for an active lead.", annotations: writeAnnotations,
-    inputSchema: z.object({ leadId: z.string().min(1), action: z.string().min(1).max(1000), dueAt: z.string().datetime().nullable().optional(), ownerId: z.string().uuid().nullable().optional(), expectedVersion: z.number().int().positive().optional() }),
-  }, async ({ leadId, ...input }) => {
+    inputSchema: z.object({ leadId: z.string().min(1), action: z.string().min(1).max(1000), dueAt: z.string().datetime().nullable().optional(), ownerId: z.string().uuid().nullable().optional(), assignToMe: z.boolean().optional(), expectedVersion: z.number().int().positive().optional() }),
+  }, async ({ leadId, assignToMe, ...input }) => {
     requireScope(actor, "leads.write");
+    assertOwnerSelectorConflict(input.ownerId, assignToMe);
+    if (assignToMe) input.ownerId = principalUserId(actor);
     return textResult(await setNextAction(leadId, input, actor, "lead_set_next_action"));
   });
 
@@ -173,8 +202,14 @@ export function buildMcpServer(actor: ActorContext) {
 
   server.registerTool("lead_tasks_list", {
     title: "List lead tasks", description: "List CRM tasks with lead, owner, status, priority, type and date filters.", annotations: readAnnotations,
-    inputSchema: z.object({ leadId: z.string().uuid().optional(), ownerId: z.string().uuid().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional(), priorities: z.array(z.enum(LEAD_TASK_PRIORITIES)).optional(), types: z.array(z.enum(LEAD_TASK_TYPES)).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional(), overdue: z.boolean().optional(), dueToday: z.boolean().optional(), noDate: z.boolean().optional(), includeCompleted: z.boolean().optional(), limit: z.number().int().min(1).max(500).default(50), offset: z.number().int().min(0).default(0) }),
-  }, async (args) => { requireScope(actor, "leads.read"); return textResult(await listTasks(args)); });
+    inputSchema: z.object({ leadId: z.string().uuid().optional(), ownerId: z.string().uuid().optional(), mine: z.boolean().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional(), priorities: z.array(z.enum(LEAD_TASK_PRIORITIES)).optional(), types: z.array(z.enum(LEAD_TASK_TYPES)).optional(), from: z.string().datetime().optional(), to: z.string().datetime().optional(), overdue: z.boolean().optional(), dueToday: z.boolean().optional(), noDate: z.boolean().optional(), includeCompleted: z.boolean().optional(), limit: z.number().int().min(1).max(500).default(50), offset: z.number().int().min(0).default(0) }),
+  }, async (args) => {
+    requireScope(actor, "leads.read");
+    assertOwnerSelectorConflict(args.ownerId, args.mine);
+    const { mine, ...filters } = args;
+    if (mine) filters.ownerId = principalUserId(actor);
+    return textResult(await listTasks(filters));
+  });
 
   server.registerTool("lead_task_get", {
     title: "Get lead task", description: "Get one lead task with lead context and version.", annotations: readAnnotations,
@@ -183,8 +218,13 @@ export function buildMcpServer(actor: ActorContext) {
 
   server.registerTool("lead_task_create", {
     title: "Create lead task", description: "Create a task, call, follow-up, meeting, research or proposal task for a lead.", annotations: writeAnnotations,
-    inputSchema: z.object({ leadId: z.string().uuid(), title: z.string().min(1).max(300), description: z.string().max(5000).nullable().optional(), type: z.enum(LEAD_TASK_TYPES).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), dueAt: z.string().datetime().nullable().optional(), startAt: z.string().datetime().nullable().optional(), endAt: z.string().datetime().nullable().optional(), allDay: z.boolean().optional(), ownerId: z.string().uuid().nullable().optional(), order: z.number().int().optional() }),
-  }, async (input) => { requireScope(actor, "leads.write"); return textResult(await createTask(input, actor, "lead_task_create")); });
+    inputSchema: z.object({ leadId: z.string().uuid(), title: z.string().min(1).max(300), description: z.string().max(5000).nullable().optional(), type: z.enum(LEAD_TASK_TYPES).optional(), priority: z.enum(LEAD_TASK_PRIORITIES).optional(), dueAt: z.string().datetime().nullable().optional(), startAt: z.string().datetime().nullable().optional(), endAt: z.string().datetime().nullable().optional(), allDay: z.boolean().optional(), ownerId: z.string().uuid().nullable().optional(), assignToMe: z.boolean().optional(), order: z.number().int().optional() }),
+  }, async ({ assignToMe, ...input }) => {
+    requireScope(actor, "leads.write");
+    assertOwnerSelectorConflict(input.ownerId, assignToMe);
+    if (assignToMe) input.ownerId = principalUserId(actor);
+    return textResult(await createTask(input, actor, "lead_task_create"));
+  });
 
   server.registerTool("lead_task_update", {
     title: "Update lead task", description: "Update an active task. Supply expectedVersion when acting on a previously-read task.", annotations: writeAnnotations,
@@ -213,8 +253,14 @@ export function buildMcpServer(actor: ActorContext) {
 
   server.registerTool("calendar_list", {
     title: "List CRM calendar", description: "List scheduled CRM tasks in a bounded date range.", annotations: readAnnotations,
-    inputSchema: z.object({ from: z.string().datetime(), to: z.string().datetime(), ownerId: z.string().uuid().optional(), leadId: z.string().uuid().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional() }),
-  }, async (input) => { requireScope(actor, "leads.read"); return textResult(await listCalendar(input)); });
+    inputSchema: z.object({ from: z.string().datetime(), to: z.string().datetime(), ownerId: z.string().uuid().optional(), mine: z.boolean().optional(), leadId: z.string().uuid().optional(), statuses: z.array(z.enum(LEAD_TASK_STATUSES)).optional() }),
+  }, async (input) => {
+    requireScope(actor, "leads.read");
+    assertOwnerSelectorConflict(input.ownerId, input.mine);
+    const { mine, ...filters } = input;
+    if (mine) filters.ownerId = principalUserId(actor);
+    return textResult(await listCalendar(filters));
+  });
 
   return server;
 }

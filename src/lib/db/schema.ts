@@ -28,6 +28,25 @@ export const userSessions = pgTable("user_sessions", {
   index("user_sessions_revoked_idx").on(table.revokedAt),
 ]);
 
+export const mcpCredentials = pgTable("mcp_credentials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  tokenPrefix: text("token_prefix").notNull(),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default(["leads.read", "leads.write"]),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+}, (table) => [
+  index("mcp_credentials_user_idx").on(table.userId),
+  index("mcp_credentials_active_idx").on(table.active),
+  index("mcp_credentials_revoked_idx").on(table.revokedAt),
+  index("mcp_credentials_expires_idx").on(table.expiresAt),
+]);
+
 export const leads = pgTable(
   "leads",
   {

@@ -1,53 +1,152 @@
 # Remote MCP
 
-O MCP fica em `/mcp` e é construído com o SDK TypeScript oficial.
+O MCP fica em `/mcp` e usa os mesmos domain services da interface web.
 
-## Fluxo
+## Modos de autenticação
 
-1. O cliente autentica via Bearer.
-2. `authorizeMcpRequest` resolve um `ActorContext` e scopes.
-3. O handler instancia `buildMcpServer(actor)`.
-4. A tool valida input com Zod.
-5. A tool chama os mesmos services utilizados pela interface.
-6. O service aplica guards, persiste alterações, activity e audit.
-7. O resultado é devolvido ao host MCP.
+```text
+none
+token
+user_query_token
+oauth
+```
 
-## Recomendações para ChatGPT
+### none
 
-Conecte o endpoint HTTPS implantado, não `localhost`.
+Somente development.
 
-Para desenvolvimento privado, `MCP_AUTH_MODE=token` é a configuração mais simples. Para produção e múltiplos usuários, utilize OAuth/JWT com um IdP e configure os três campos `MCP_OAUTH_*`.
+### token
 
-Ao pesquisar leads externamente, o agente deve:
+Bearer token global legado:
 
-1. procurar duplicatas com `leads_search`;
-2. usar `leads_upsert` em lotes de até 50;
-3. preservar URLs de origem;
-4. adicionar claims verificáveis com `lead_add_evidence`;
-5. distinguir fatos de inferências;
-6. definir próxima ação quando fizer sentido;
-7. nunca contatar `DO_NOT_CONTACT`.
+```http
+Authorization: Bearer <MCP_API_TOKEN>
+```
+
+Útil para curl, Postman e rollback.
+
+### user_query_token
+
+Modo recomendado para o MVP com contas ChatGPT pessoais.
+
+Cada usuário cria sua própria credential em:
+
+```text
+/settings/mcp
+```
+
+O AgencyOS gera uma Server URL:
+
+```text
+https://<domain>/mcp?key=agmcp_<secret>
+```
+
+No ChatGPT, cadastre o custom MCP server usando essa URL e selecione **No authentication**.
+
+O banco nunca armazena o token bruto. Ele guarda apenas:
+
+- SHA-256 do token;
+- prefixo curto;
+- scopes;
+- owner;
+- metadata de uso/revogação.
+
+### oauth
+
+Preservado para uma futura implantação OAuth/JWT.
+
+## Identidade
+
+Credenciais pessoais resolvem:
+
+```text
+credential
+  ↓
+AgencyOS User
+  ↓
+ActorContext
+
+type = AGENT
+id = mcp:<credential-id>
+name = ChatGPT · <user-name>
+principalUserId = <user-id>
+credentialId = <credential-id>
+```
+
+Assim a timeline distingue humano e ChatGPT:
+
+```text
+Guilherme updated lead
+ChatGPT · Guilherme created task
+Sócio recorded call
+ChatGPT · Sócio added note
+```
+
+## Tools pessoais
+
+`mcp_whoami` retorna a identidade segura da conexão sem secrets.
+
+As seguintes tools aceitam `mine=true`:
+
+- `leads_search`
+- `lead_tasks_list`
+- `calendar_list`
+
+As seguintes operações aceitam `assignToMe=true`:
+
+- `lead_task_create`
+- `lead_set_next_action`
+
+`ownerId` não pode ser combinado com `mine`/`assignToMe`.
+
+## Revogação
+
+Revogar uma credential bloqueia somente aquela conexão.
+
+Desativar um usuário:
+
+1. revoga suas sessões web;
+2. revoga todas as suas credentials MCP.
+
+Credentials de outros usuários não são afetadas.
+
+## Segurança
+
+A query string funciona como uma credencial secreta.
+
+- HTTPS é obrigatório.
+- Não logar `request.url` no endpoint MCP.
+- Nunca persistir a Server URL completa.
+- Nunca incluir `key` no audit.
+- O segredo é mostrado uma única vez.
+- Rotacione criando nova credential, testando e então revogando a antiga.
+- `/mcp?key=...` não deve redirecionar.
+
+## ChatGPT integration gate
+
+Antes de mudar produção para:
+
+```env
+MCP_AUTH_MODE=user_query_token
+```
+
+validar empiricamente duas contas ChatGPT diferentes:
+
+1. cada uma usa uma URL diferente;
+2. `mcp_whoami` resolve o usuário correto;
+3. discovery funciona;
+4. reads funcionam;
+5. writes funcionam;
+6. `mine` retorna ownership correto;
+7. revogar A não afeta B;
+8. reconexões preservam o query parameter.
 
 ## Lead Tasks & Calendar
 
-Tasks are first-class CRM domain objects and are always scoped to a lead. Agents use the same task service as the web UI and REST API.
+As regras existentes continuam valendo:
 
-Additional tools:
-
-- `lead_tasks_list` — filter tasks by lead, owner, state, priority, type and dates.
-- `lead_task_get` — fetch one task with lead context and version.
-- `lead_task_create` — create task/call/follow-up/meeting/research/proposal work.
-- `lead_task_update` — edit active task fields or move TODO -> DOING.
-- `lead_task_complete` — complete an active task.
-- `lead_task_cancel` — cancel an active task.
-- `lead_task_reschedule` — change deadline or start/end.
-- `lead_tasks_reorder` — set explicit sort order.
-- `calendar_list` — list scheduled tasks in a bounded date range.
-
-Rules enforced for agents and humans:
-
-- `CALL`, `FOLLOW_UP` and `MEETING` creation/rescheduling is blocked for `DO_NOT_CONTACT` leads.
-- writes support optimistic concurrency through `expectedVersion`.
-- terminal tasks cannot be reopened or rescheduled.
-- all writes generate lead timeline activity and audit records.
-- active tasks automatically derive the lead `nextAction` compatibility fields.
+- `CALL`, `FOLLOW_UP` e `MEETING` são bloqueados em `DO_NOT_CONTACT`;
+- writes usam optimistic concurrency;
+- tasks terminais não são reabertas;
+- writes geram timeline + audit;
+- tasks ativas derivam os campos de compatibilidade `nextAction`.

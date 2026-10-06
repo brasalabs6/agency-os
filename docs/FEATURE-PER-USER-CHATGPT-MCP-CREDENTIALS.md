@@ -2,7 +2,7 @@
 
 **Produto:** AgencyOS Leads  
 **Feature:** MCP Credentials per User / Personal ChatGPT Connections  
-**Status:** Proposed — awaiting approval  
+**Status:** Implemented  
 **Prioridade:** P0  
 **Tipo:** MCP / Authentication / Agent Identity / Team Collaboration  
 **Última atualização:** 2026-10-06
@@ -1053,7 +1053,7 @@ Tokens determinísticos somente dentro dos testes.
 Criar:
 
 ~~~text
-drizzle/0003_mcp_user_credentials.sql
+drizzle/0007_mcp_user_credentials.sql
 ~~~
 
 A migration:
@@ -1381,10 +1381,6 @@ Isso entrega isolamento por usuário, audit e revogação individual sem OAuth o
 
 ---
 
-## 60. Implementação neste turno
+## 60. Estado da implementação
 
-Nenhuma implementação funcional deve ser feita neste turno.
-
-Este documento é somente o plano para revisão.
-
-A implementação começa somente após aprovação explícita desta spec.
+Implementação aprovada e executada no repositório. O gate restante para ativação em produção é aplicar a migration, validar o E2E real nas duas contas ChatGPT e somente então mudar `MCP_AUTH_MODE` para `user_query_token`.
