@@ -17,7 +17,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   let data; try { data = await getLead(id); } catch (error) { if (error instanceof DomainError && error.status === 404) notFound(); throw error; }
   const { lead, activities, evidence, tasks } = data;
-  const [users, currentUser] = await Promise.all([listUsers(), requireCurrentUser()]);
+  const users = await listUsers();
+  const currentUser = await requireCurrentUser();
   return <><Link href="/leads" className="mb-4 inline-flex items-center gap-1 text-xs text-muted hover:text-[var(--text)]"><ArrowLeft size={13}/>Voltar aos leads</Link>
   {lead.doNotContact ? <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"><ShieldAlert size={17} className="mt-0.5 shrink-0"/><div><strong>Não contatar.</strong> Ações de contato humano e via MCP são bloqueadas enquanto este estado estiver ativo.</div></div> : null}
   <header className="mb-6 flex flex-col justify-between gap-4 xl:flex-row xl:items-start"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1><StatusBadge status={lead.status}/></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted"><span>{lead.segment ?? "Segmento não informado"}</span><span className="inline-flex items-center gap-1"><MapPin size={13}/>{[lead.city, lead.state].filter(Boolean).join(" / ") || "Local não informado"}</span><span>v{lead.version}</span></div><div className="mt-3 flex flex-wrap gap-1.5">{lead.tags.map((tag) => <span key={tag} className="rounded-md border border-default px-2 py-1 text-[11px] text-muted">{tag}</span>)}</div></div><LeadActions lead={lead} users={users} currentUserId={currentUser.id}/></header>
