@@ -4,10 +4,11 @@ on:
   pull_request:
     branches: [main]
   push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -22,7 +23,6 @@ jobs:
     env:
       DATA_DRIVER: mock
       APP_AUTH_DISABLED: "false"
-      SESSION_SECRET: ci-session-secret-ci-session-secret-123456
       MCP_AUTH_MODE: token
       MCP_API_TOKEN: ci-mcp-token-ci-mcp-token-123456
       NEXT_PUBLIC_APP_NAME: AgencyOS CI
@@ -30,18 +30,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
 
       - name: Validate migration sequence
         run: |
@@ -75,9 +78,17 @@ jobs:
       - name: Runtime smoke on built artifact
         run: |
           set -euo pipefail
+
           npm run start -- -H 127.0.0.1 -p 3000 > /tmp/agencyos-next.log 2>&1 &
           APP_PID=$!
-          trap 'kill "$APP_PID" 2>/dev/null || true; cat /tmp/agencyos-next.log' EXIT
+
+          cleanup() {
+            status=$?
+            kill "$APP_PID" 2>/dev/null || true
+            cat /tmp/agencyos-next.log
+            exit "$status"
+          }
+          trap cleanup EXIT
 
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error --max-time 3 http://127.0.0.1:3000/api/health > /tmp/health.json; then
@@ -86,9 +97,32 @@ jobs:
             sleep 1
           done
 
+          test -s /tmp/health.json
           jq -e '.ok == true and .dataDriver == "mock"' /tmp/health.json
-          curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/login | grep -q "AgencyOS Leads"
-          curl --fail --silent --show-error --location --max-time 5 http://127.0.0.1:3000/ | grep -q "AgencyOS Leads"
+
+          login_status="$(curl --silent --show-error --output /tmp/login.html --write-out '%{http_code}' --max-time 5 http://127.0.0.1:3000/login)"
+          test "$login_status" = "200"
+          grep -q "AgencyOS Leads" /tmp/login.html
+
+          auth_status="$(curl --silent --show-error --output /tmp/auth.json --write-out '%{http_code}' --max-time 5 http://127.0.0.1:3000/api/auth/me)"
+          test "$auth_status" = "401"
+          jq -e '.error.code == "AUTH_REQUIRED"' /tmp/auth.json
+
+          root_status="$(curl --silent --show-error --dump-header /tmp/root.headers --output /tmp/root.html --write-out '%{http_code}' --max-time 5 http://127.0.0.1:3000/)"
+          case "$root_status" in
+            302|303|307|308) ;;
+            *)
+              echo "Expected unauthenticated / to redirect, got HTTP $root_status" >&2
+              exit 1
+              ;;
+          esac
+          grep -Eiq '^location: /login([?[:space:]]|$)' /tmp/root.headers
+
+          if grep -Eq '⨯ Error:|uncaughtException|unhandledRejection' /tmp/agencyos-next.log; then
+            echo "Runtime smoke detected an application error:" >&2
+            cat /tmp/agencyos-next.log >&2
+            exit 1
+          fi
 
   preview-deployment:
     name: Vercel Preview
@@ -111,12 +145,15 @@ jobs:
           for attempt in $(seq 1 60); do
             payload="$(curl --fail --silent --show-error               -H "Authorization: Bearer $GH_TOKEN"               -H "Accept: application/vnd.github+json"               -H "X-GitHub-Api-Version: 2022-11-28"               "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$SHA/status")"
 
-            state="$(printf '%s' "$payload" | jq -r '[.statuses[] | select(.context == "Vercel")][0].state // "missing"')"
-            target="$(printf '%s' "$payload" | jq -r '[.statuses[] | select(.context == "Vercel")][0].target_url // ""')"
+            state="$(printf '%s' "$payload" | jq -r '[.statuses[] | select(.context == "Vercel")] | sort_by(.updated_at) | last | .state // "missing"')"
+            target="$(printf '%s' "$payload" | jq -r '[.statuses[] | select(.context == "Vercel")] | sort_by(.updated_at) | last | .target_url // ""')"
             echo "Vercel preview state: $state $target"
 
             case "$state" in
-              success) exit 0 ;;
+              success)
+                test -n "$target"
+                exit 0
+                ;;
               error|failure) exit 1 ;;
             esac
 
