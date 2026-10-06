@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
 import { LEAD_TASK_PRIORITIES, LEAD_TASK_TYPES, type Lead, type LeadTaskView, type UserSummary } from "@/lib/domain/types";
 import { DEFAULT_TIME_ZONE, zonedDateTimeToUtc } from "@/lib/domain/time";
+import { ModalShell } from "./modal-shell";
 import { taskPriorityLabels, taskTypeLabels } from "./task-badge";
+import { buttonPrimaryClass, buttonSecondaryClass, controlClass, textareaClass } from "./ui-kit";
 
 type LeadOption = Pick<Lead, "id" | "name" | "status">;
 
@@ -83,11 +84,11 @@ export function TaskForm({
   }, [open, fixedLeadId, initialTask, defaultDate, leads]);
 
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === leadId), [leads, leadId]);
-  if (!open) return null;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setSaving(true); setError(null);
+    setSaving(true);
+    setError(null);
     try {
       if (!leadId) throw new Error("Selecione um lead.");
       if (scheduleMode === "event" && (!startAt || !endAt)) throw new Error("Eventos precisam de início e fim.");
@@ -116,27 +117,28 @@ export function TaskForm({
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/35 p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-    <form onSubmit={submit} className="surface w-full max-w-2xl rounded-xl" role="dialog" aria-modal="true" aria-label={initialTask ? "Editar tarefa" : "Nova tarefa"}>
-      <div className="flex items-center justify-between border-b border-default px-5 py-4"><div><h2 className="text-sm font-semibold">{initialTask ? "Editar tarefa" : "Nova tarefa"}</h2><p className="mt-0.5 text-xs text-muted">{selectedLead ? selectedLead.name : "Vincule a tarefa a um lead"}</p></div><button type="button" onClick={onClose} className="focus-ring rounded-md p-1.5 text-muted hover:bg-[var(--panel-2)]" aria-label="Fechar"><X size={16}/></button></div>
-      <div className="grid gap-4 p-5 sm:grid-cols-2">
-        {!fixedLeadId ? <label className="sm:col-span-2"><span className="mb-1 block text-xs text-muted">Lead</span><select value={leadId} onChange={(e) => setLeadId(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" required>{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>)}</select></label> : null}
-        <label className="sm:col-span-2"><span className="mb-1 block text-xs text-muted">Título</span><input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" placeholder="Ex.: Ligar para o responsável" required maxLength={300}/></label>
-        <label><span className="mb-1 block text-xs text-muted">Tipo</span><select value={type} onChange={(e) => setType(e.target.value as typeof type)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm">{LEAD_TASK_TYPES.map((item) => <option key={item} value={item}>{taskTypeLabels[item]}</option>)}</select></label>
-        <label><span className="mb-1 block text-xs text-muted">Prioridade</span><select value={priority} onChange={(e) => setPriority(e.target.value as typeof priority)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm">{LEAD_TASK_PRIORITIES.map((item) => <option key={item} value={item}>{taskPriorityLabels[item]}</option>)}</select></label>
-        {initialTask && initialTask.status !== "DONE" && initialTask.status !== "CANCELED" ? <label><span className="mb-1 block text-xs text-muted">Status</span><select value={status} onChange={(e) => setStatus(e.target.value as "TODO" | "DOING")} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm"><option value="TODO">To do</option><option value="DOING">Em andamento</option></select></label> : null}
-        <label><span className="mb-1 block text-xs text-muted">Responsável</span><select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm"><option value="">Sem responsável</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
-        <label><span className="mb-1 block text-xs text-muted">Agenda</span><select value={scheduleMode} onChange={(e) => setScheduleMode(e.target.value as typeof scheduleMode)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm"><option value="none">Sem data</option><option value="deadline">Prazo</option><option value="event">Evento com duração</option></select></label>
-        {scheduleMode === "deadline" ? <label className="sm:col-span-2"><span className="mb-1 block text-xs text-muted">Data e hora limite</span><input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" required/></label> : null}
-        {scheduleMode === "event" ? <><label><span className="mb-1 block text-xs text-muted">Início</span><input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" required/></label><label><span className="mb-1 block text-xs text-muted">Fim</span><input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} className="w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" required/></label></> : null}
-        {scheduleMode !== "none" ? <label className="flex items-center gap-2 text-xs text-muted sm:col-span-2"><input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)}/> Evento de dia inteiro</label> : null}
-        <label className="sm:col-span-2"><span className="mb-1 block text-xs text-muted">Descrição</span><textarea value={description ?? ""} onChange={(e) => setDescription(e.target.value)} className="min-h-24 w-full rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-sm" maxLength={5000}/></label>
-        {error ? <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</div> : null}
+  return <ModalShell open={open} onClose={onClose} title={initialTask ? "Editar tarefa" : "Nova tarefa"} description={selectedLead ? selectedLead.name : "Vincule a tarefa a um lead"} sizeClass="sm:max-w-2xl">
+    <form onSubmit={submit}>
+      <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+        {!fixedLeadId ? <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Lead</span><select value={leadId} onChange={(event) => setLeadId(event.target.value)} className={controlClass} required>{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.name} · {lead.status}</option>)}</select></label> : null}
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Título</span><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} className={controlClass} placeholder="Ex.: Ligar para o responsável" required maxLength={300}/></label>
+        <label><span className="mb-1.5 block text-xs font-medium">Tipo</span><select value={type} onChange={(event) => setType(event.target.value as typeof type)} className={controlClass}>{LEAD_TASK_TYPES.map((item) => <option key={item} value={item}>{taskTypeLabels[item]}</option>)}</select></label>
+        <label><span className="mb-1.5 block text-xs font-medium">Prioridade</span><select value={priority} onChange={(event) => setPriority(event.target.value as typeof priority)} className={controlClass}>{LEAD_TASK_PRIORITIES.map((item) => <option key={item} value={item}>{taskPriorityLabels[item]}</option>)}</select></label>
+        {initialTask && initialTask.status !== "DONE" && initialTask.status !== "CANCELED" ? <label><span className="mb-1.5 block text-xs font-medium">Status</span><select value={status} onChange={(event) => setStatus(event.target.value as "TODO" | "DOING")} className={controlClass}><option value="TODO">A fazer</option><option value="DOING">Em andamento</option></select></label> : null}
+        <label><span className="mb-1.5 block text-xs font-medium">Responsável</span><select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} className={controlClass}><option value="">Sem responsável</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
+        <label><span className="mb-1.5 block text-xs font-medium">Agenda</span><select value={scheduleMode} onChange={(event) => setScheduleMode(event.target.value as typeof scheduleMode)} className={controlClass}><option value="none">Sem data</option><option value="deadline">Prazo</option><option value="event">Evento com duração</option></select></label>
+        {scheduleMode === "deadline" ? <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Data e hora limite</span><input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} className={controlClass} required/></label> : null}
+        {scheduleMode === "event" ? <><label><span className="mb-1.5 block text-xs font-medium">Início</span><input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} className={controlClass} required/></label><label><span className="mb-1.5 block text-xs font-medium">Fim</span><input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} className={controlClass} required/></label></> : null}
+        {scheduleMode !== "none" ? <label className="flex items-center gap-2 text-xs text-muted sm:col-span-2"><input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)}/> Evento de dia inteiro</label> : null}
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-medium">Descrição</span><textarea value={description ?? ""} onChange={(event) => setDescription(event.target.value)} className={`${textareaClass} min-h-24`} maxLength={5000}/></label>
+        {error ? <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</div> : null}
       </div>
-      <div className="flex justify-end gap-2 border-t border-default px-5 py-4"><button type="button" onClick={onClose} className="rounded-md border border-default px-3 py-2 text-xs">Cancelar</button><button disabled={saving} className="rounded-md bg-[var(--text)] px-3 py-2 text-xs font-medium text-[var(--panel)] disabled:opacity-50">{saving ? "Salvando..." : initialTask ? "Salvar" : "Criar tarefa"}</button></div>
+      <div className="flex flex-col-reverse gap-2 border-t border-default px-4 py-4 sm:flex-row sm:justify-end sm:px-5"><button type="button" onClick={onClose} className={buttonSecondaryClass}>Cancelar</button><button disabled={saving} className={buttonPrimaryClass}>{saving ? "Salvando…" : initialTask ? "Salvar alterações" : "Criar tarefa"}</button></div>
     </form>
-  </div>;
+  </ModalShell>;
 }

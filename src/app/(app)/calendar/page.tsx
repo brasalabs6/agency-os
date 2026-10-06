@@ -1,5 +1,6 @@
 import { CalendarBoard, type CalendarView } from "@/components/calendar-board";
 import { PageHeader } from "@/components/page-header";
+import { buttonPrimaryClass, controlClass } from "@/components/ui-kit";
 import { searchLeads, listUsers } from "@/lib/services/leads";
 import { listCalendar } from "@/lib/services/tasks";
 import { zonedDateTimeToUtc } from "@/lib/domain/time";
@@ -49,7 +50,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const calendar = await listCalendar({ ...dates, ownerId });
   const leads = await searchLeads({ limit: 100 });
   const users = await listUsers();
-  return <><PageHeader title="Calendar" description="Agenda comercial derivada das tarefas dos leads. Horários exibidos em America/Sao_Paulo."/>
-    <form method="get" className="mb-4 flex max-w-sm gap-2"><input type="hidden" name="view" value={view}/><input type="hidden" name="date" value={anchor}/><select name="owner" defaultValue={ownerRaw ?? ""} className="h-9 flex-1 rounded-md border border-default bg-[var(--panel)] px-3 text-sm"><option value="">All team</option><option value="me">Mine</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select><button className="rounded-md bg-[var(--text)] px-3 text-xs font-medium text-[var(--panel)]">Filter</button></form>
-    <CalendarBoard tasks={calendar.items} leads={leads.items} users={users} view={view} anchor={anchor} ownerFilter={ownerRaw}/></>;
+  return <>
+    <PageHeader title="Calendário" description="Agenda comercial baseada nas tarefas dos leads. No celular, a visão Agenda é usada para manter a leitura confortável."/>
+    <form method="get" className="mb-4 grid gap-2 sm:max-w-md sm:grid-cols-[minmax(0,1fr)_auto]">
+      <input type="hidden" name="view" value={view}/><input type="hidden" name="date" value={anchor}/>
+      <select name="owner" defaultValue={ownerRaw ?? ""} className={controlClass} aria-label="Filtrar calendário por responsável"><option value="">Toda a equipe</option><option value="me">Minhas tarefas</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
+      <button className={buttonPrimaryClass}>Aplicar</button>
+    </form>
+    <CalendarBoard tasks={calendar.items} leads={leads.items} users={users} view={view} anchor={anchor} ownerFilter={ownerRaw}/>
+  </>;
 }

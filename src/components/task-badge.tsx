@@ -1,7 +1,7 @@
 import type { LeadTaskPriority, LeadTaskStatus, LeadTaskType } from "@/lib/domain/types";
 
 export const taskTypeLabels: Record<LeadTaskType, string> = {
-  TASK: "Task",
+  TASK: "Tarefa",
   CALL: "Ligação",
   FOLLOW_UP: "Follow-up",
   MEETING: "Reunião",
@@ -17,6 +17,13 @@ export const taskPriorityLabels: Record<LeadTaskPriority, string> = {
   URGENT: "Urgente",
 };
 
+const statusLabels: Record<LeadTaskStatus, string> = {
+  TODO: "A fazer",
+  DOING: "Em andamento",
+  DONE: "Concluída",
+  CANCELED: "Cancelada",
+};
+
 export function TaskPriorityBadge({ priority }: { priority: LeadTaskPriority }) {
   const classes: Record<LeadTaskPriority, string> = {
     LOW: "bg-[var(--panel-2)] text-muted",
@@ -24,7 +31,7 @@ export function TaskPriorityBadge({ priority }: { priority: LeadTaskPriority }) 
     HIGH: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
     URGENT: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
   };
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${classes[priority]}`}>{taskPriorityLabels[priority]}</span>;
+  return <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ${classes[priority]}`}>{taskPriorityLabels[priority]}</span>;
 }
 
 export function TaskStatusBadge({ status }: { status: LeadTaskStatus }) {
@@ -34,5 +41,5 @@ export function TaskStatusBadge({ status }: { status: LeadTaskStatus }) {
     DONE: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
     CANCELED: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
   };
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${classes[status]}`}>{status}</span>;
+  return <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-medium ${classes[status]}`}>{statusLabels[status]}</span>;
 }
