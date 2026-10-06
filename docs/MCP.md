@@ -122,6 +122,16 @@ A query string funciona como uma credencial secreta.
 - Rotacione criando nova credential, testando e então revogando a antiga.
 - `/mcp?key=...` não deve redirecionar.
 
+## Production rollout status
+
+Production is configured with:
+
+```env
+MCP_AUTH_MODE=user_query_token
+```
+
+Per-user ChatGPT connections authenticate with their own secret Server URL (`/mcp?key=...`). The legacy global Bearer token remains available in code as a rollback mode, but is not the active production authentication mode.
+
 ## ChatGPT integration gate
 
 Antes de mudar produção para:
