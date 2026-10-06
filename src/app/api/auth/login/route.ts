@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { setAppSession, verifyAppPassword } from "@/lib/auth/app-auth";
+import { setAppSessionToken } from "@/lib/auth/app-auth";
+import { signIn } from "@/lib/services/auth";
+import { assertSameOrigin } from "@/lib/services/http";
 
 export async function POST(request: NextRequest) {
-  const body = await request.formData();
-  const password = String(body.get("password") ?? "");
-  if (!(await verifyAppPassword(password))) return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
-  await setAppSession({ type: "USER", id: "00000000-0000-4000-8000-000000000001", name: "Guilherme", scopes: ["leads.read", "leads.write"] });
-  return NextResponse.redirect(new URL("/", request.url), 303);
+  try {
+    assertSameOrigin(request);
+    const body = await request.formData();
+    const email = String(body.get("email") ?? "");
+    const password = String(body.get("password") ?? "");
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const session = await signIn(email, password, ip);
+    await setAppSessionToken(session.token, session.expiresAt);
+    return NextResponse.redirect(new URL("/", request.url), 303);
+  } catch {
+    return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+  }
 }

@@ -40,7 +40,7 @@ function shiftAnchor(anchor: string, view: CalendarView, direction: number) {
   return dayKey(date);
 }
 
-export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor }: { tasks: LeadTaskView[]; leads: Lead[]; users: UserSummary[]; view: CalendarView; anchor: string }) {
+export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor, ownerFilter }: { tasks: LeadTaskView[]; leads: Lead[]; users: UserSummary[]; view: CalendarView; anchor: string; ownerFilter?: string }) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [formOpen, setFormOpen] = useState(false);
@@ -61,7 +61,8 @@ export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor 
   }, [tasks]);
 
   function navigate(nextView: CalendarView, nextAnchor = anchor) {
-    router.push(`/calendar?view=${nextView}&date=${nextAnchor}`);
+    const owner = ownerFilter ? `&owner=${encodeURIComponent(ownerFilter)}` : "";
+    router.push(`/calendar?view=${nextView}&date=${nextAnchor}${owner}`);
   }
 
   function upsert(task: LeadTaskView) {

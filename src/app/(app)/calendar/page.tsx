@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { searchLeads, listUsers } from "@/lib/services/leads";
 import { listCalendar } from "@/lib/services/tasks";
 import { zonedDateTimeToUtc } from "@/lib/domain/time";
+import { requireCurrentUser } from "@/lib/auth/app-auth";
 
 function validView(value?: string): CalendarView { return value === "week" || value === "agenda" ? value : "month"; }
 function todayKey() {
@@ -39,13 +40,18 @@ function range(anchor: string, view: CalendarView) {
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
+  const currentUser = await requireCurrentUser();
+  const ownerRaw = typeof params.owner === "string" ? params.owner : undefined;
+  const ownerId = ownerRaw === "me" ? currentUser.id : ownerRaw || undefined;
   const view = validView(typeof params.view === "string" ? params.view : undefined);
   const anchor = validDate(typeof params.date === "string" ? params.date : undefined);
   const dates = range(anchor, view);
   const [calendar, leads, users] = await Promise.all([
-    listCalendar({ ...dates }),
+    listCalendar({ ...dates, ownerId }),
     searchLeads({ limit: 100 }),
     listUsers(),
   ]);
-  return <><PageHeader title="Calendar" description="Agenda comercial derivada das tarefas dos leads. Horários exibidos em America/Sao_Paulo."/><CalendarBoard tasks={calendar.items} leads={leads.items} users={users} view={view} anchor={anchor}/></>;
+  return <><PageHeader title="Calendar" description="Agenda comercial derivada das tarefas dos leads. Horários exibidos em America/Sao_Paulo."/>
+    <form method="get" className="mb-4 flex max-w-sm gap-2"><input type="hidden" name="view" value={view}/><input type="hidden" name="date" value={anchor}/><select name="owner" defaultValue={ownerRaw ?? ""} className="h-9 flex-1 rounded-md border border-default bg-[var(--panel)] px-3 text-sm"><option value="">All team</option><option value="me">Mine</option>{users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select><button className="rounded-md bg-[var(--text)] px-3 text-xs font-medium text-[var(--panel)]">Filter</button></form>
+    <CalendarBoard tasks={calendar.items} leads={leads.items} users={users} view={view} anchor={anchor} ownerFilter={ownerRaw}/></>;
 }

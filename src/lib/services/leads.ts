@@ -19,6 +19,14 @@ async function mustGetLead(id: string): Promise<Lead> {
   return lead;
 }
 
+async function ensureAssignableUser(ownerId?: string | null) {
+  if (!ownerId) return;
+  const users = await repo().listUsers();
+  if (!users.some((user) => user.id === ownerId)) {
+    throw new DomainError("Owner must be an active user", "INVALID_OWNER", 422, { ownerId });
+  }
+}
+
 function ensureVersion(result: Lead | null, expectedVersion?: number): Lead {
   if (result) return result;
   if (expectedVersion != null) throw new DomainError("Lead changed since it was read. Reload before writing again.", "VERSION_CONFLICT", 409);
@@ -41,6 +49,8 @@ export async function listActivities(id: string, limit = 100) {
 }
 
 export async function createLead(input: CreateLeadInput, actor: ActorContext, options?: { allowDuplicate?: boolean; tool?: string }) {
+  await ensureAssignableUser(input.ownerId);
+  await ensureAssignableUser(input.nextActionOwnerId);
   const duplicate = await repo().findDuplicate(input);
   if (duplicate && !options?.allowDuplicate) {
     throw new DomainError("Possible duplicate lead", "POSSIBLE_DUPLICATE", 409, { duplicateId: duplicate.id, duplicateName: duplicate.name });
@@ -103,9 +113,18 @@ export async function upsertLeads(inputs: CreateLeadInput[], actor: ActorContext
 export async function updateLead(id: string, input: UpdateLeadInput, actor: ActorContext, tool?: string) {
   if (input.status !== undefined) throw new DomainError("Use moveLeadStage to change status", "STATUS_UPDATE_REQUIRES_TRANSITION", 422);
   const before = await mustGetLead(id);
+  if (input.ownerId !== undefined) await ensureAssignableUser(input.ownerId);
+  if (input.nextActionOwnerId !== undefined) await ensureAssignableUser(input.nextActionOwnerId);
   const updated = ensureVersion(await repo().update(id, input), input.expectedVersion);
   const changed = Object.keys(input).filter((key) => key !== "expectedVersion");
-  await repo().addActivity({ leadId: id, type: input.score !== undefined && input.score !== before.score ? "SCORE_UPDATED" : "UPDATED", actor, summary: `Lead atualizado: ${changed.join(", ") || "sem alterações"}.`, metadata: { changed } });
+  const ownerChanged = input.ownerId !== undefined && input.ownerId !== before.owner?.id;
+  await repo().addActivity({
+    leadId: id,
+    type: ownerChanged ? "ASSIGNED" : input.score !== undefined && input.score !== before.score ? "SCORE_UPDATED" : "UPDATED",
+    actor,
+    summary: ownerChanged ? `Responsável alterado de ${before.owner?.name ?? "Unassigned"} para ${updated.owner?.name ?? "Unassigned"}.` : `Lead atualizado: ${changed.join(", ") || "sem alterações"}.`,
+    metadata: ownerChanged ? { previousOwnerId: before.owner?.id ?? null, newOwnerId: updated.owner?.id ?? null } : { changed },
+  });
   await repo().addAudit({ actor, tool, action: "lead.update", leadId: id, input: input as unknown as Record<string, unknown>, result: { version: updated.version } });
   return updated;
 }

@@ -1,9 +1,9 @@
 import type { Lead, LeadActivity, LeadEvidence, UserSummary } from "@/lib/domain/types";
 
 export const DEMO_USERS: UserSummary[] = [
-  { id: "00000000-0000-4000-8000-000000000001", name: "Guilherme", email: "guilherme@agency.local" },
-  { id: "00000000-0000-4000-8000-000000000002", name: "Comercial", email: "comercial@agency.local" },
-  { id: "00000000-0000-4000-8000-000000000003", name: "ChatGPT", email: "agent@agency.local" },
+  { id: "00000000-0000-4000-8000-000000000001", name: "Guilherme", email: "guilherme@agency.local", role: "ADMIN", active: true },
+  { id: "00000000-0000-4000-8000-000000000002", name: "Comercial", email: "comercial@agency.local", role: "MEMBER", active: true },
+  { id: "00000000-0000-4000-8000-000000000003", name: "ChatGPT", email: "agent@agency.local", role: "MEMBER", active: false },
 ];
 
 const at = (days: number, hour = 10) => {

@@ -12,3 +12,11 @@ export function getLeadRepository(): LeadRepository {
 export function getTaskRepository(): TaskRepository {
   return process.env.DATA_DRIVER === "postgres" ? postgresTaskRepository : mockTaskRepository;
 }
+
+import type { AuthRepository } from "./auth-repository";
+import { mockAuthRepository } from "./mock-auth-repository";
+import { postgresAuthRepository } from "./postgres-auth-repository";
+
+export function getAuthRepository(): AuthRepository {
+  return process.env.DATA_DRIVER === "postgres" ? postgresAuthRepository : mockAuthRepository;
+}

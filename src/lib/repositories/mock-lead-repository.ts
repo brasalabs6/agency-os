@@ -40,6 +40,7 @@ export class MockLeadRepository implements LeadRepository {
       if (filters.city && normalize(lead.city) !== normalize(filters.city)) return false;
       if (filters.opportunity && lead.primaryOpportunity !== filters.opportunity) return false;
       if (filters.ownerId && lead.owner?.id !== filters.ownerId) return false;
+      if (filters.ownerUnassigned && lead.owner) return false;
       if (filters.scoreMin != null && (lead.score ?? -1) < filters.scoreMin) return false;
       if (filters.scoreMax != null && (lead.score ?? 101) > filters.scoreMax) return false;
       if (filters.tags?.length && !filters.tags.every((tag) => lead.tags.includes(tag))) return false;
@@ -141,7 +142,7 @@ export class MockLeadRepository implements LeadRepository {
     return clone(audit);
   }
 
-  async listUsers(): Promise<UserSummary[]> { return clone(DEMO_USERS); }
+  async listUsers(): Promise<UserSummary[]> { return clone(DEMO_USERS.filter((user) => user.active !== false)); }
 }
 
 export const mockLeadRepository = new MockLeadRepository();

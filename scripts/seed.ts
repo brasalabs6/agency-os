@@ -1,5 +1,6 @@
 import { getDb } from "@/lib/db/client";
 import { leadActivities, leadEvidence, leadTasks, leads, users } from "@/lib/db/schema";
+import { hashPassword } from "@/lib/auth/password";
 import { createDemoActivities, createDemoEvidence, createDemoLeads, DEMO_USERS } from "@/lib/mock/seed-data";
 import { createDemoTasks } from "@/lib/mock/task-seed-data";
 
@@ -11,7 +12,19 @@ const activities = createDemoActivities(demoLeads);
 const evidence = createDemoEvidence(demoLeads);
 const tasks = createDemoTasks(demoLeads);
 
-await db.insert(users).values(DEMO_USERS.map((user, index) => ({ id: user.id, name: user.name, email: user.email ?? `${index}@example.com`, role: index === 0 ? "ADMIN" as const : "MEMBER" as const }))).onConflictDoNothing();
+const seededUsers = await Promise.all(DEMO_USERS.map(async (user, index) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email ?? `${index}@example.com`,
+  role: user.role ?? (index === 0 ? "ADMIN" as const : "MEMBER" as const),
+  active: user.active !== false,
+  passwordHash: index === 0
+    ? await hashPassword(process.env.SEED_ADMIN_PASSWORD ?? "admin-agencyos-2026")
+    : index === 1
+      ? await hashPassword(process.env.SEED_MEMBER_PASSWORD ?? "partner-agencyos-2026")
+      : null,
+})));
+await db.insert(users).values(seededUsers).onConflictDoNothing();
 await db.insert(leads).values(demoLeads.map((lead) => ({
   id: lead.id, name: lead.name, legalName: lead.legalName, segment: lead.segment, city: lead.city, state: lead.state,
   website: lead.website, googleMapsUrl: lead.googleMapsUrl, instagramUrl: lead.instagramUrl, phone: lead.phone, whatsapp: lead.whatsapp,

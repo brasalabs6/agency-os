@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       city: p.get("city") || undefined,
       opportunity: opportunity && SERVICE_OPPORTUNITIES.includes(opportunity as never) ? opportunity as LeadSearchFilters["opportunity"] : undefined,
       ownerId: p.get("ownerId") || undefined,
+      ownerUnassigned: bool(p.get("ownerUnassigned")),
       scoreMin: num(p.get("scoreMin")), scoreMax: num(p.get("scoreMax")),
       tags: p.getAll("tag"), overdue: bool(p.get("overdue")), dueToday: bool(p.get("dueToday")), noNextAction: bool(p.get("noNextAction")),
       limit: num(p.get("limit")), offset: num(p.get("offset")),

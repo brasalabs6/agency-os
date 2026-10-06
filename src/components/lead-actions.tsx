@@ -15,7 +15,7 @@ async function requestJson(url: string, method: "POST" | "PATCH", body: unknown)
 
 const fieldClass = "h-10 w-full rounded-md border border-default bg-[var(--panel)] px-3 text-sm";
 
-export function LeadActions({ lead, users }: { lead: Lead; users: UserSummary[] }) {
+export function LeadActions({ lead, users, currentUserId }: { lead: Lead; users: UserSummary[]; currentUserId: string }) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +30,7 @@ export function LeadActions({ lead, users }: { lead: Lead; users: UserSummary[] 
 
   return <>
     <div className="flex flex-wrap gap-2">
+      {lead.owner?.id !== currentUserId ? <button onClick={() => void run(() => requestJson(`/api/leads/${lead.id}`, "PATCH", { ownerId: currentUserId, expectedVersion: lead.version }))} className="rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel-2)]">Assign to me</button> : null}
       <button onClick={() => setMode("edit")} className="rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel-2)]">Editar</button>
       <button onClick={() => setMode("note")} className="rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel-2)]">Adicionar nota</button>
       <button onClick={() => setMode("contact")} disabled={lead.doNotContact} className="rounded-md border border-default bg-[var(--panel)] px-3 py-2 text-xs font-medium hover:bg-[var(--panel-2)] disabled:cursor-not-allowed disabled:opacity-40">Registrar contato</button>

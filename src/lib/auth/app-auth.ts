@@ -1,74 +1,60 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { DomainError } from "@/lib/domain/errors";
 import type { ActorContext } from "@/lib/domain/types";
+import type { AuthenticatedUser } from "./types";
+import { resolveSessionToken, signOutToken } from "@/lib/services/auth";
 
-const COOKIE_NAME = "agencyos_session";
+export const APP_SESSION_COOKIE = "agencyos_session";
 
-function secret() {
-  return process.env.SESSION_SECRET ?? "development-only-session-secret-change-me";
+function authDisabled() {
+  const disabled = process.env.APP_AUTH_DISABLED !== "false";
+  if (disabled && process.env.NODE_ENV === "production" && process.env.NEXT_PHASE !== "phase-production-build") throw new DomainError("APP_AUTH_DISABLED cannot be enabled in production", "INSECURE_AUTH_CONFIGURATION", 500);
+  return disabled;
 }
 
-function sign(value: string) {
-  return createHmac("sha256", secret()).update(value).digest("base64url");
+function demoUser(): AuthenticatedUser {
+  return { id: "00000000-0000-4000-8000-000000000001", name: "Guilherme", email: "guilherme@agency.local", role: "ADMIN", active: true, sessionId: null };
 }
 
-export function createSessionValue(actor: ActorContext): string {
-  const payload = Buffer.from(JSON.stringify({ ...actor, exp: Date.now() + 1000 * 60 * 60 * 24 * 7 })).toString("base64url");
-  return `${payload}.${sign(payload)}`;
-}
-
-function parseSession(value?: string): ActorContext | null {
-  if (!value) return null;
-  const [payload, signature] = value.split(".");
-  if (!payload || !signature) return null;
-  const expected = sign(payload);
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as ActorContext & { exp: number };
-    if (!parsed.exp || parsed.exp < Date.now()) return null;
-    return { type: parsed.type, id: parsed.id, name: parsed.name, scopes: parsed.scopes };
-  } catch {
-    return null;
-  }
-}
-
-export async function getAppActor(): Promise<ActorContext | null> {
-  if (process.env.APP_AUTH_DISABLED !== "false") {
-    return { type: "USER", id: "00000000-0000-4000-8000-000000000001", name: "Guilherme", scopes: ["leads.read", "leads.write"] };
-  }
+export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+  if (authDisabled()) return demoUser();
   const store = await cookies();
-  return parseSession(store.get(COOKIE_NAME)?.value);
+  const token = store.get(APP_SESSION_COOKIE)?.value;
+  return token ? resolveSessionToken(token) : null;
+}
+
+export async function requireCurrentUser(): Promise<AuthenticatedUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireAdminUser(): Promise<AuthenticatedUser> {
+  const user = await requireCurrentUser();
+  if (user.role !== "ADMIN") redirect("/settings/profile?forbidden=1");
+  return user;
 }
 
 export async function requireAppActor(): Promise<ActorContext> {
-  const actor = await getAppActor();
-  if (!actor) redirect("/login");
-  return actor;
+  const user = await requireCurrentUser();
+  return { type: "USER", id: user.id, name: user.name, role: user.role, scopes: ["leads.read", "leads.write"] };
 }
 
-export async function verifyAppPassword(password: string): Promise<boolean> {
-  const expected = process.env.APP_PASSWORD;
-  if (!expected) return false;
-  const a = Buffer.from(password);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-export async function setAppSession(actor: ActorContext) {
+export async function setAppSessionToken(token: string, expiresAt: string) {
   const store = await cookies();
-  store.set(COOKIE_NAME, createSessionValue(actor), {
+  store.set(APP_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7,
+    expires: new Date(expiresAt),
     path: "/",
   });
 }
 
 export async function clearAppSession() {
   const store = await cookies();
-  store.delete(COOKIE_NAME);
+  const token = store.get(APP_SESSION_COOKIE)?.value;
+  await signOutToken(token);
+  store.delete(APP_SESSION_COOKIE);
 }

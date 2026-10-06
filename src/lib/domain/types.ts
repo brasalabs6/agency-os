@@ -55,6 +55,8 @@ export interface UserSummary {
   id: string;
   name: string;
   email?: string;
+  role?: UserRole;
+  active?: boolean;
 }
 
 export interface Lead {
@@ -193,6 +195,7 @@ export interface LeadSearchFilters {
   city?: string;
   opportunity?: ServiceOpportunity;
   ownerId?: string;
+  ownerUnassigned?: boolean;
   scoreMin?: number;
   scoreMax?: number;
   tags?: string[];
@@ -241,6 +244,7 @@ export interface ActorContext {
   id: string;
   name: string;
   scopes?: string[];
+  role?: UserRole;
 }
 
 export interface CreateLeadInput {

@@ -22,6 +22,8 @@ Mini CRM interno **agent-first** para uma agência de sites, landing pages, auto
 - Deduplicação antes de criar/upsert.
 - Evidence/source ledger.
 - Activity timeline com `USER`, `AGENT` e `SYSTEM`.
+- Login individual por email/senha com roles `ADMIN`/`MEMBER`, sessões revogáveis e Team management.
+- Ownership por usuário em Leads/Tasks, `Assign to me` e filtros por responsável.
 - Audit log para operações mutáveis de domínio/MCP.
 - Data driver `mock` para execução rápida.
 - Data driver PostgreSQL via Drizzle ORM.
@@ -76,25 +78,51 @@ npm run db:seed
 npm run dev
 ```
 
-`drizzle/0000_initial.sql` contém o schema inicial e `drizzle/0001_lead_tasks_calendar.sql` adiciona Tasks/Calendar com migração idempotente de `next_action` legado.
+`drizzle/0000_initial.sql` contém o schema inicial, `0001_lead_tasks_calendar.sql` adiciona Tasks/Calendar e `0002_team_auth.sql` adiciona autenticação multiusuário e sessões.
 
 ## Autenticação do app
 
-Para desenvolvimento, o padrão é:
+O AgencyOS possui logins individuais e roles simples `ADMIN` / `MEMBER`.
+
+Para desenvolvimento rápido, o bypass continua disponível:
 
 ```env
 APP_AUTH_DISABLED=true
 ```
 
-Para ativar a tela de login interna:
+Esse modo é **bloqueado em production**. Para testar autenticação real no mock:
 
 ```env
+DATA_DRIVER=mock
 APP_AUTH_DISABLED=false
-APP_PASSWORD=uma-senha-forte
-SESSION_SECRET=um-segredo-aleatorio-longo-com-32-ou-mais-caracteres
+SESSION_TTL_DAYS=30
 ```
 
-A sessão usa cookie `httpOnly`, `SameSite=Lax` e HMAC. Para uma organização maior, substitua essa camada por OIDC/SSO sem alterar o domínio.
+Credenciais demo padrão:
+
+```text
+guilherme@agency.local / admin-agencyos-2026
+comercial@agency.local / partner-agencyos-2026
+```
+
+Em PostgreSQL, aplique a migration e crie o primeiro admin:
+
+```bash
+npm run db:push
+DATA_DRIVER=postgres npm run admin:create
+```
+
+A sessão usa token opaco aleatório em cookie `HttpOnly`/`SameSite=Lax`; o banco armazena somente o hash SHA-256 do token. Passwords são derivados com `scrypt` + salt aleatório.
+
+Administração:
+
+```text
+/settings/profile
+/settings/team
+/settings
+```
+
+Veja `docs/FEATURE-TEAM-AUTH-MULTI-USER.md`.
 
 ## Remote MCP
 
@@ -291,4 +319,7 @@ Antes de publicar:
 
 ## Feature spec
 
-A especificação detalhada de Tasks + Calendar está em `docs/FEATURE-LEAD-TASKS-CALENDAR.md`.
+Specs implementadas:
+
+- `docs/FEATURE-LEAD-TASKS-CALENDAR.md`
+- `docs/FEATURE-TEAM-AUTH-MULTI-USER.md`

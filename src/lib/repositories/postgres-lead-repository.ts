@@ -22,7 +22,7 @@ function iso(value: Date | null | undefined): string | null {
 type LeadRow = typeof leads.$inferSelect;
 
 async function userMap(): Promise<Map<string, UserSummary>> {
-  const rows = await getDb().select({ id: users.id, name: users.name, email: users.email }).from(users);
+  const rows = await getDb().select({ id: users.id, name: users.name, email: users.email, role: users.role, active: users.active }).from(users);
   return new Map(rows.map((user) => [user.id, user]));
 }
 
@@ -59,6 +59,7 @@ export class PostgresLeadRepository implements LeadRepository {
     if (filters.city) conditions.push(ilike(leads.city, filters.city));
     if (filters.opportunity) conditions.push(eq(leads.primaryOpportunity, filters.opportunity));
     if (filters.ownerId) conditions.push(eq(leads.ownerId, filters.ownerId));
+    if (filters.ownerUnassigned) conditions.push(isNull(leads.ownerId));
     if (filters.scoreMin != null) conditions.push(gte(leads.score, filters.scoreMin));
     if (filters.scoreMax != null) conditions.push(lte(leads.score, filters.scoreMax));
     if (filters.noNextAction) conditions.push(isNull(leads.nextAction));
@@ -175,7 +176,7 @@ export class PostgresLeadRepository implements LeadRepository {
   }
 
   async listUsers(): Promise<UserSummary[]> {
-    return getDb().select({ id: users.id, name: users.name, email: users.email }).from(users);
+    return getDb().select({ id: users.id, name: users.name, email: users.email, role: users.role, active: users.active }).from(users).where(eq(users.active, true));
   }
 }
 
