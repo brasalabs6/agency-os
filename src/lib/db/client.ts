@@ -35,8 +35,8 @@ export function getDb() {
     max_lifetime: 30,
     connection: {
       application_name: "agency-os-vercel",
-      statement_timeout: "15000",
-      idle_in_transaction_session_timeout: "15000",
+      statement_timeout: 15000,
+      idle_in_transaction_session_timeout: 15000,
     },
   });
 
