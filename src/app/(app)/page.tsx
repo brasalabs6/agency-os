@@ -8,8 +8,13 @@ import { DateLabel } from "@/components/date-label";
 import { EmptyState } from "@/components/ui-kit";
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { PIPELINE_GROUPS } from "@/lib/domain/status";
+import { requireCurrentUser } from "@/lib/auth/app-auth";
 
 export default async function OverviewPage() {
+  // Child server components may execute in parallel with the protected layout.
+  // Authenticate here before touching the database so unauthenticated requests
+  // cannot trigger dashboard queries while the layout is redirecting to /login.
+  await requireCurrentUser();
   const data = await getDashboardSummary();
   return <>
     <PageHeader title="Visão geral" description="O que precisa avançar agora no pipeline."/>
