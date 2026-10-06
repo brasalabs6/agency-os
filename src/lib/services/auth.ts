@@ -76,7 +76,6 @@ export async function resolveSessionToken(token: string): Promise<AuthenticatedU
   const result = await getAuthRepository().getSessionByTokenHash(sessionTokenHash(token));
   if (!result) return null;
   if (!result.user.active) { await getAuthRepository().revokeSession(result.session.id); return null; }
-  void getAuthRepository().touchSession(result.session.id);
   return { ...publicUser(result.user), sessionId: result.session.id };
 }
 
