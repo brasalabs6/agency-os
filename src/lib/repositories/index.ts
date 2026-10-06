@@ -11,7 +11,7 @@ import type { McpCredentialRepository } from "./mcp-credential-repository";
 import { mockMcpCredentialRepository } from "./mock-mcp-credential-repository";
 import { postgresMcpCredentialRepository } from "./postgres-mcp-credential-repository";
 
-function shouldUsePostgres(): boolean {
+function isPostgresDriver(): boolean {
   const driver = process.env.DATA_DRIVER;
   if (driver === "postgres") return true;
   if (driver === "mock") return false;
@@ -19,17 +19,17 @@ function shouldUsePostgres(): boolean {
 }
 
 export function getLeadRepository(): LeadRepository {
-  return shouldUsePostgres() ? postgresLeadRepository : mockLeadRepository;
+  return isPostgresDriver() ? postgresLeadRepository : mockLeadRepository;
 }
 
 export function getTaskRepository(): TaskRepository {
-  return shouldUsePostgres() ? postgresTaskRepository : mockTaskRepository;
+  return isPostgresDriver() ? postgresTaskRepository : mockTaskRepository;
 }
 
 export function getAuthRepository(): AuthRepository {
-  return shouldUsePostgres() ? postgresAuthRepository : mockAuthRepository;
+  return isPostgresDriver() ? postgresAuthRepository : mockAuthRepository;
 }
 
 export function getMcpCredentialRepository(): McpCredentialRepository {
-  return shouldUsePostgres() ? postgresMcpCredentialRepository : mockMcpCredentialRepository;
+  return isPostgresDriver() ? postgresMcpCredentialRepository : mockMcpCredentialRepository;
 }
