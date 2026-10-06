@@ -36,8 +36,26 @@ function noteFailure(keys: string[]) {
 
 export async function signIn(emailRaw: string, password: string, ip?: string | null) {
   const email = normalizeEmail(emailRaw); const keys = rateLimitKeys(email, ip); assertRateLimit(keys);
-  const user = await getAuthRepository().findUserByEmail(email);
-  const valid = Boolean(user?.active && await verifyPassword(password, user.passwordHash));
+  let user = await getAuthRepository().findUserByEmail(email);
+  let valid = Boolean(user?.active && await verifyPassword(password, user.passwordHash));
+
+  // One-time recovery path for the initial production admin. This exists only
+  // until the account successfully signs in for the first time; lastLoginAt
+  // permanently disables the fallback and normal per-user password auth takes over.
+  if (
+    !valid &&
+    user?.active &&
+    user.role === "ADMIN" &&
+    user.email === "admin@agency.local" &&
+    !user.lastLoginAt &&
+    process.env.APP_PASSWORD &&
+    password === process.env.APP_PASSWORD
+  ) {
+    const passwordHash = await hashPassword(password);
+    user = await getAuthRepository().updateUser(user.id, { passwordHash }) ?? user;
+    valid = true;
+  }
+
   if (!valid || !user) {
     noteFailure(keys);
     await authAudit(SYSTEM_ACTOR, "AUTH_LOGIN_FAILURE", { email });
