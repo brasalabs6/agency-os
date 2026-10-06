@@ -1,0 +1,75 @@
+name: Production Smoke
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  statuses: read
+
+jobs:
+  production-smoke:
+    name: Production Smoke
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      GH_TOKEN: ${{ github.token }}
+      PRODUCTION_URL: https://agency-os-eight-navy.vercel.app
+
+    steps:
+      - name: Wait for Vercel production deployment
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 60); do
+            payload="$(curl --fail --silent --show-error               -H "Authorization: Bearer $GH_TOKEN"               -H "Accept: application/vnd.github+json"               -H "X-GitHub-Api-Version: 2022-11-28"               "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$SHA/status")"
+
+            state="$(printf '%s' "$payload" | jq -r '[.statuses[] | select(.context == "Vercel")][0].state // "missing"')"
+            echo "Vercel production state: $state"
+
+            case "$state" in
+              success) break ;;
+              error|failure) exit 1 ;;
+            esac
+
+            sleep 10
+          done
+
+      - name: Verify production serves this commit
+        run: |
+          set -euo pipefail
+
+          matched=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 10 "$PRODUCTION_URL/api/health" > /tmp/health.json; then
+              served_sha="$(jq -r '.commit // ""' /tmp/health.json)"
+              db_ok="$(jq -r '.database // ""' /tmp/health.json)"
+              echo "Production commit=$served_sha database=$db_ok"
+
+              if [ "$served_sha" = "$SHA" ] && [ "$db_ok" = "ok" ]; then
+                matched=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+
+          if [ "$matched" -ne 1 ]; then
+            echo "Production did not converge to expected SHA $SHA" >&2
+            cat /tmp/health.json 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Smoke public routes
+        run: |
+          set -euo pipefail
+          jq -e '.ok == true and .database == "ok" and .environment == "production"' /tmp/health.json
+          curl --fail --silent --show-error --max-time 10 "$PRODUCTION_URL/login" | grep -q "AgencyOS Leads"
+          curl --fail --silent --show-error --location --max-time 10 "$PRODUCTION_URL/" | grep -q "AgencyOS Leads"
