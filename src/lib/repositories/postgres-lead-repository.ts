@@ -77,19 +77,15 @@ export class PostgresLeadRepository implements LeadRepository {
     const limit = Math.min(filters.limit ?? 50, 100);
     const offset = filters.offset ?? 0;
     const db = getDb();
-    const [rows, countRows, people] = await Promise.all([
-      db.select().from(leads).where(whereClause).orderBy(desc(leads.score), desc(leads.updatedAt)).limit(limit).offset(offset),
-      db.select({ count: sql<number>`count(*)::int` }).from(leads).where(whereClause),
-      userMap(),
-    ]);
+    const rows = await db.select().from(leads).where(whereClause).orderBy(desc(leads.score), desc(leads.updatedAt)).limit(limit).offset(offset);
+    const countRows = await db.select({ count: sql<number>`count(*)::int` }).from(leads).where(whereClause);
+    const people = await userMap();
     return { items: rows.map((row) => mapLead(row, people)), total: countRows[0]?.count ?? 0, limit, offset };
   }
 
   async getById(id: string) {
-    const [row, people] = await Promise.all([
-      getDb().select().from(leads).where(eq(leads.id, id)).limit(1),
-      userMap(),
-    ]);
+    const row = await getDb().select().from(leads).where(eq(leads.id, id)).limit(1);
+    const people = await userMap();
     return row[0] ? mapLead(row[0], people) : null;
   }
 
@@ -100,10 +96,8 @@ export class PostgresLeadRepository implements LeadRepository {
     if (input.email) candidates.push(eq(leads.email, input.email));
     if (input.name && input.city) candidates.push(and(ilike(leads.name, input.name), ilike(leads.city, input.city))!);
     if (!candidates.length) return null;
-    const [rows, people] = await Promise.all([
-      getDb().select().from(leads).where(or(...candidates)).limit(1),
-      userMap(),
-    ]);
+    const rows = await getDb().select().from(leads).where(or(...candidates)).limit(1);
+    const people = await userMap();
     return rows[0] ? mapLead(rows[0], people) : null;
   }
 
