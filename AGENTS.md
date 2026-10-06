@@ -1,5 +1,7 @@
 # Agent instructions
 
+- This repository is PUBLIC. Never commit secrets, credentials, tokens, private URLs, personal email addresses, customer data, or other sensitive/private information. Use environment variables or deployment secrets for any sensitive configuration.
+- Keep production identities and credentials out of source code; use non-personal placeholder values in committed examples and fallback logic.
 - Preserve canonical lead statuses in `src/lib/domain/types.ts`.
 - Do not bypass `src/lib/services` from UI, API, or MCP.
 - Never introduce raw SQL tools to MCP.
