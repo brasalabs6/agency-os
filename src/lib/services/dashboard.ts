@@ -44,6 +44,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const db = getDb();
   const now = new Date();
   const { start, end } = dayRangeInTimeZone();
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+  const nowIso = now.toISOString();
 
   const attentionCondition = and(
     inArray(leads.status, ACTIVE_STATUSES),
@@ -79,18 +82,18 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       select
         count(*) filter (
           where status in ('TODO', 'DOING')
-            and coalesce(due_at, start_at) >= ${start}
-            and coalesce(due_at, start_at) <= ${end}
+            and coalesce(due_at, start_at) >= ${startIso}::timestamptz
+            and coalesce(due_at, start_at) <= ${endIso}::timestamptz
         )::int as tasks_today,
         count(*) filter (
           where status in ('TODO', 'DOING')
-            and coalesce(due_at, start_at) < ${now}
+            and coalesce(due_at, start_at) < ${nowIso}::timestamptz
         )::int as overdue_tasks,
         count(*) filter (
           where status in ('TODO', 'DOING')
             and type = 'MEETING'
-            and coalesce(due_at, start_at) >= ${start}
-            and coalesce(due_at, start_at) <= ${end}
+            and coalesce(due_at, start_at) >= ${startIso}::timestamptz
+            and coalesce(due_at, start_at) <= ${endIso}::timestamptz
         )::int as meetings_today
       from ${leadTasks}
     `),
