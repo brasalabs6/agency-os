@@ -1,7 +1,7 @@
 import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { ActivityType, ActorType, LeadStatus, LeadTaskPriority, LeadTaskStatus, LeadTaskType, ServiceOpportunity, UserRole } from "@/lib/domain/types";
-import type { AiRunStatus, ApprovalActionType, ApprovalStatus, ClientProjectStatus, ContractStatus, DiagnosticStatus, ObligationStatus, ProposalStatus } from "@/lib/domain/automation";
+import type { AiRunStatus, ApprovalActionType, ApprovalStatus, ClientProjectStatus, ContractStatus, DiagnosticFinding, DiagnosticRecommendation, DiagnosticStatus, ObligationStatus, PolicyCheck, ProfileFact, ProposalStatus } from "@/lib/domain/automation";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -191,7 +191,7 @@ export const businessProfiles = pgTable("business_profiles", {
   contacts: jsonb("contacts").$type<Record<string, unknown>>().notNull().default({}),
   businessSignals: jsonb("business_signals").$type<Record<string, unknown>>().notNull().default({}),
   competition: jsonb("competition").$type<Record<string, unknown>[]>().notNull().default([]),
-  facts: jsonb("facts").$type<Record<string, unknown>[]>().notNull().default([]),
+  facts: jsonb("facts").$type<ProfileFact[]>().notNull().default([]),
   createdByType: text("created_by_type").$type<ActorType>().notNull(),
   createdById: text("created_by_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -204,9 +204,9 @@ export const diagnostics = pgTable("diagnostics", {
   status: text("status").$type<DiagnosticStatus>().notNull().default("DRAFT"),
   version: integer("version").notNull().default(1),
   executiveSummary: text("executive_summary").notNull().default(""),
-  strengths: jsonb("strengths").$type<Record<string, unknown>[]>().notNull().default([]),
-  gaps: jsonb("gaps").$type<Record<string, unknown>[]>().notNull().default([]),
-  recommendations: jsonb("recommendations").$type<Record<string, unknown>[]>().notNull().default([]),
+  strengths: jsonb("strengths").$type<DiagnosticFinding[]>().notNull().default([]),
+  gaps: jsonb("gaps").$type<DiagnosticFinding[]>().notNull().default([]),
+  recommendations: jsonb("recommendations").$type<DiagnosticRecommendation[]>().notNull().default([]),
   scores: jsonb("scores").$type<Record<string, number>>().notNull().default({}),
   recommendedServices: jsonb("recommended_services").$type<string[]>().notNull().default([]),
   internalNotes: text("internal_notes"),
@@ -326,7 +326,7 @@ export const approvalRequests = pgTable("approval_requests", {
   payloadHash: text("payload_hash").notNull(),
   preview: text("preview").notNull(),
   rationale: text("rationale"),
-  policyChecks: jsonb("policy_checks").$type<Record<string, unknown>[]>().notNull().default([]),
+  policyChecks: jsonb("policy_checks").$type<PolicyCheck[]>().notNull().default([]),
   status: text("status").$type<ApprovalStatus>().notNull().default("PENDING"),
   createdByType: text("created_by_type").$type<ActorType>().notNull(),
   createdById: text("created_by_id").notNull(),
