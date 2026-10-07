@@ -1,20 +1,33 @@
-import { randomUUID } from "node:crypto";
 import { DomainError } from "@/lib/domain/errors";
 import type { ActorContext } from "@/lib/domain/types";
-import type { ApprovalActionType, ChannelMessage, PolicyCheck } from "@/lib/domain/automation";
+import type {
+  ApprovalActionType,
+  ApprovalRequest,
+  ChannelMessage,
+  PolicyCheck,
+} from "@/lib/domain/automation";
 import { getAutomationRepository, getLeadRepository } from "@/lib/repositories";
 import { getLead, moveLeadStage } from "./leads";
 import {
   automationAudit,
+  canonicalJson,
   ensureApprovalNotExpired,
   hashPayload,
   nowIso,
+  requireApprovalActor,
   requireHumanActor,
   throwVersionConflict,
 } from "./automation-utils";
 
 const repo = () => getAutomationRepository();
 const leadRepo = () => getLeadRepository();
+const SPECIALIZED_ACTIONS = new Set<ApprovalActionType>(["PROPOSAL_SEND", "CONTRACT_SEND"]);
+
+function maxIso(a?: string | null, b?: string | null) {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return new Date(a) >= new Date(b) ? a : b;
+}
 
 export async function listChannelConnections() {
   return repo().listChannelConnections();
@@ -66,16 +79,32 @@ export async function ingestWhatsAppConversation(
 ) {
   const connection = await repo().getChannelConnection(input.connectionId);
   if (!connection) throw new DomainError("Channel connection not found", "CHANNEL_CONNECTION_NOT_FOUND", 404);
-  const last = input.messages.at(-1)?.sentAt ?? null;
+
+  const existing = await repo().getConversationByExternal(input.connectionId, input.externalId);
+  if (existing?.leadId && input.leadId && existing.leadId !== input.leadId) {
+    throw new DomainError(
+      "Gateway ingest cannot reassign an already linked conversation",
+      "CONVERSATION_LEAD_CONFLICT",
+      409,
+    );
+  }
+
+  const newestInputMessage = input.messages.reduce<string | null>(
+    (latest, message) => maxIso(latest, message.sentAt),
+    null,
+  );
   const conversation = await repo().upsertConversation({
     connectionId: input.connectionId,
     externalId: input.externalId,
-    leadId: input.leadId ?? null,
+    leadId: existing?.leadId ?? input.leadId ?? null,
     contactAddress: input.contactAddress,
-    contactDisplayName: input.contactDisplayName ?? null,
-    lastMessageAt: last,
-    optOutDetected: input.optOutDetected ?? false,
+    contactDisplayName: input.contactDisplayName === undefined
+      ? existing?.contactDisplayName ?? null
+      : input.contactDisplayName,
+    lastMessageAt: maxIso(existing?.lastMessageAt, newestInputMessage),
+    optOutDetected: Boolean(existing?.optOutDetected || input.optOutDetected === true),
   });
+
   const messages: ChannelMessage[] = [];
   for (const message of input.messages) {
     messages.push(await repo().upsertMessage({
@@ -84,23 +113,29 @@ export async function ingestWhatsAppConversation(
       rawMetadata: message.rawMetadata ?? {},
     }));
   }
-  if (input.leadId && input.optOutDetected) {
-    const data = await getLead(input.leadId);
+
+  if (conversation.leadId && conversation.optOutDetected) {
+    const data = await getLead(conversation.leadId);
     if (data.lead.status !== "DO_NOT_CONTACT") {
-      await moveLeadStage(input.leadId, "DO_NOT_CONTACT", actor, {
+      await moveLeadStage(conversation.leadId, "DO_NOT_CONTACT", actor, {
         reason: "Opt-out detected in WhatsApp conversation",
         tool,
       });
     }
   }
+
   await automationAudit(
     actor,
     "whatsapp.ingest",
     "conversation",
     conversation.id,
-    { messageCount: messages.length, optOutDetected: conversation.optOutDetected },
+    {
+      messageCount: messages.length,
+      optOutDetected: conversation.optOutDetected,
+      preservedLeadBinding: Boolean(existing?.leadId),
+    },
     {},
-    input.leadId,
+    conversation.leadId,
     tool,
   );
   return { conversation, messages };
@@ -122,10 +157,19 @@ export async function linkConversation(
   optOutDetected: boolean | undefined,
   actor: ActorContext,
 ) {
+  requireHumanActor(actor);
   if (leadId) await getLead(leadId);
   const updated = await repo().linkConversation(id, leadId, optOutDetected);
   if (!updated) throw new DomainError("Conversation not found", "CONVERSATION_NOT_FOUND", 404);
-  await automationAudit(actor, "conversation.link", "conversation", id, { leadId, optOutDetected }, {}, leadId);
+  if (updated.leadId && updated.optOutDetected) {
+    const data = await getLead(updated.leadId);
+    if (data.lead.status !== "DO_NOT_CONTACT") {
+      await moveLeadStage(updated.leadId, "DO_NOT_CONTACT", actor, {
+        reason: "Conversation explicitly marked as opted out",
+      });
+    }
+  }
+  await automationAudit(actor, "conversation.link", "conversation", id, { leadId, optOutDetected }, {}, updated.leadId);
   return updated;
 }
 
@@ -139,7 +183,7 @@ async function defaultPolicyChecks(actionType: ApprovalActionType, leadId?: stri
       message: "Lead is allowed to receive contact.",
     });
   }
-  if (actionType === "WHATSAPP_SEND") {
+  if (actionType !== "OTHER") {
     checks.push({
       id: "human_approval",
       passed: true,
@@ -161,7 +205,15 @@ export async function createApprovalRequest(
   },
   actor: ActorContext,
   tool?: string,
+  options: { allowSpecializedAction?: boolean } = {},
 ) {
+  if (SPECIALIZED_ACTIONS.has(input.actionType) && !options.allowSpecializedAction) {
+    throw new DomainError(
+      "Proposal/contract approvals must be created through their specialized workflow",
+      "SPECIALIZED_APPROVAL_FLOW_REQUIRED",
+      422,
+    );
+  }
   if (input.leadId) await getLead(input.leadId);
   const checks = [
     ...(await defaultPolicyChecks(input.actionType, input.leadId)),
@@ -210,12 +262,43 @@ export async function getApproval(id: string) {
   return approval;
 }
 
+function assertSpecializedApprovalEdit(
+  before: ApprovalRequest,
+  payload: Record<string, unknown>,
+  preview: string,
+) {
+  if (!SPECIALIZED_ACTIONS.has(before.actionType)) return;
+  const immutableKeys = before.actionType === "PROPOSAL_SEND"
+    ? ["proposalId", "version", "renderedContent"]
+    : ["contractId", "version", "renderedContent"];
+  for (const key of immutableKeys) {
+    if (canonicalJson(payload[key]) !== canonicalJson(before.payload[key])) {
+      throw new DomainError(
+        "Specialized approval document identity/content cannot be edited in the approval inbox",
+        "SPECIALIZED_APPROVAL_IMMUTABLE",
+        409,
+        { key },
+      );
+    }
+  }
+  if (preview !== before.preview) {
+    throw new DomainError(
+      "Specialized approval preview cannot diverge from the versioned document",
+      "SPECIALIZED_APPROVAL_IMMUTABLE",
+      409,
+    );
+  }
+}
+
 export async function approveRequest(
   id: string,
   input: { expectedVersion?: number; payload?: Record<string, unknown>; preview?: string },
   actor: ActorContext,
 ) {
-  requireHumanActor(actor);
+  requireApprovalActor(actor);
+  if (input.expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
   const before = await getApproval(id);
   if (before.status !== "PENDING") {
     throw new DomainError("Approval is not pending", "APPROVAL_NOT_PENDING", 409);
@@ -224,11 +307,19 @@ export async function approveRequest(
   if (before.policyChecks.some((check) => !check.passed)) {
     throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
   }
+  if (before.leadId) {
+    const current = await getLead(before.leadId);
+    if (current.lead.doNotContact || current.lead.status === "DO_NOT_CONTACT") {
+      throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
+    }
+  }
   const payload = input.payload ?? before.payload;
+  const preview = input.preview ?? before.preview;
+  assertSpecializedApprovalEdit(before, payload, preview);
   const updated = await repo().updateApproval(id, input.expectedVersion, {
     payload,
     payloadHash: hashPayload(payload),
-    preview: input.preview ?? before.preview,
+    preview,
     status: "APPROVED",
     approvedByUserId: actor.id,
     approvedAt: nowIso(),
@@ -246,12 +337,32 @@ export async function approveRequest(
   return updated;
 }
 
+async function reopenRejectedSpecializedEntity(approval: ApprovalRequest) {
+  if (approval.actionType === "PROPOSAL_SEND") {
+    const proposalId = String(approval.payload.proposalId ?? "");
+    const proposal = proposalId ? await repo().getProposal(proposalId) : null;
+    if (proposal?.approvalId === approval.id && proposal.status === "PENDING_APPROVAL") {
+      await repo().updateProposal(proposal.id, proposal.version, { status: "DRAFT", approvalId: null });
+    }
+  }
+  if (approval.actionType === "CONTRACT_SEND") {
+    const contractId = String(approval.payload.contractId ?? "");
+    const contract = contractId ? await repo().getContract(contractId) : null;
+    if (contract?.approvalId === approval.id && contract.status === "PENDING_REVIEW") {
+      await repo().updateContract(contract.id, contract.version, { status: "DRAFT", approvalId: null });
+    }
+  }
+}
+
 export async function rejectRequest(
   id: string,
   expectedVersion: number | undefined,
   actor: ActorContext,
 ) {
-  requireHumanActor(actor);
+  requireApprovalActor(actor);
+  if (expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
   const before = await getApproval(id);
   if (before.status !== "PENDING") {
     throw new DomainError("Approval is not pending", "APPROVAL_NOT_PENDING", 409);
@@ -262,11 +373,118 @@ export async function rejectRequest(
     rejectedAt: nowIso(),
   });
   if (!updated) throwVersionConflict("Approval");
+  await reopenRejectedSpecializedEntity(before);
   await automationAudit(actor, "approval.reject", "approval", id, {}, { status: "REJECTED" }, before.leadId);
   return updated;
 }
 
-async function sendWhatsappPayload(payload: Record<string, unknown>) {
+export interface ApprovalExecutionExpectation {
+  actionType: ApprovalActionType;
+  leadId?: string | null;
+  entity?: {
+    idKey: "proposalId" | "contractId";
+    id: string;
+    version: number;
+    approvalId?: string | null;
+    status: string;
+    expectedStatus: string;
+  };
+}
+
+export async function claimApprovalForExecution(
+  id: string,
+  expectation: ApprovalExecutionExpectation,
+) {
+  const approval = await getApproval(id);
+  if (approval.actionType !== expectation.actionType) {
+    throw new DomainError("Approval action type mismatch", "INVALID_APPROVAL_ACTION", 422);
+  }
+
+  if (expectation.entity) {
+    if (String(approval.payload[expectation.entity.idKey] ?? "") !== expectation.entity.id) {
+      throw new DomainError("Approval is bound to another entity", "APPROVAL_ENTITY_MISMATCH", 409);
+    }
+    if (expectation.entity.approvalId !== approval.id) {
+      throw new DomainError("Entity is not bound to this approval", "APPROVAL_BINDING_MISMATCH", 409);
+    }
+  }
+  if (expectation.leadId !== undefined && approval.leadId !== expectation.leadId) {
+    throw new DomainError("Approval lead binding mismatch", "APPROVAL_LEAD_MISMATCH", 409);
+  }
+
+  if (approval.status === "EXECUTED") {
+    return { approval, alreadyExecuted: true as const };
+  }
+  if (approval.status === "EXECUTING") {
+    throw new DomainError(
+      "Approval execution is already in progress and must be reconciled before retry",
+      "APPROVAL_EXECUTION_IN_PROGRESS",
+      409,
+      { idempotencyKey: approval.id },
+    );
+  }
+  if (approval.status !== "APPROVED") {
+    throw new DomainError("Approval must be approved before execution", "APPROVAL_NOT_APPROVED", 409);
+  }
+
+  ensureApprovalNotExpired(approval);
+  if (approval.payloadHash !== hashPayload(approval.payload)) {
+    throw new DomainError("Approved payload integrity check failed", "APPROVAL_PAYLOAD_MISMATCH", 409);
+  }
+  if (approval.policyChecks.some((check) => !check.passed)) {
+    throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
+  }
+
+  if (expectation.entity) {
+    if (expectation.entity.status !== expectation.entity.expectedStatus) {
+      throw new DomainError(
+        "Entity is not in the expected state for approved execution",
+        "APPROVAL_ENTITY_STATE_MISMATCH",
+        409,
+        { expected: expectation.entity.expectedStatus, actual: expectation.entity.status },
+      );
+    }
+    if (Number(approval.payload.version) !== expectation.entity.version) {
+      throw new DomainError("Entity changed after approval request", "APPROVAL_PAYLOAD_MISMATCH", 409);
+    }
+  }
+
+  const leadId = expectation.leadId ?? approval.leadId;
+  if (leadId) {
+    const current = await getLead(leadId);
+    if (current.lead.doNotContact || current.lead.status === "DO_NOT_CONTACT") {
+      throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
+    }
+  }
+
+  const claimed = await repo().updateApproval(approval.id, approval.version, {
+    status: "EXECUTING",
+    executionResult: {
+      idempotencyKey: approval.id,
+      startedAt: nowIso(),
+    },
+  });
+  if (!claimed) throwVersionConflict("Approval");
+  return { approval: claimed, alreadyExecuted: false as const };
+}
+
+export async function completeApprovalExecution(
+  claimed: ApprovalRequest,
+  result: Record<string, unknown>,
+) {
+  if (claimed.status !== "EXECUTING") {
+    throw new DomainError("Approval was not claimed for execution", "APPROVAL_NOT_EXECUTING", 409);
+  }
+  const updated = await repo().updateApproval(claimed.id, claimed.version, {
+    status: "EXECUTED",
+    executedAt: nowIso(),
+    executionResult: result,
+  });
+  if (!updated) throwVersionConflict("Approval");
+  return updated;
+}
+
+async function sendWhatsappPayload(payload: Record<string, unknown>, idempotencyKey: string) {
   const to = String(payload.to ?? "");
   const text = String(payload.text ?? "");
   if (!to || !text) {
@@ -281,7 +499,8 @@ async function sendWhatsappPayload(payload: Record<string, unknown>) {
     if (process.env.WHATSAPP_SEND_MODE === "mock") {
       return {
         provider: "mock",
-        messageId: "mock_" + randomUUID(),
+        messageId: "mock_" + idempotencyKey,
+        idempotencyKey,
         status: "sent",
         sentAt: nowIso(),
       };
@@ -292,14 +511,17 @@ async function sendWhatsappPayload(payload: Record<string, unknown>) {
       503,
     );
   }
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "idempotency-key": idempotencyKey,
+  };
   if (process.env.WHATSAPP_API_TOKEN) {
     headers.authorization = "Bearer " + process.env.WHATSAPP_API_TOKEN;
   }
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify({ to, text, metadata: payload.metadata ?? {} }),
+    body: JSON.stringify({ to, text, metadata: payload.metadata ?? {}, idempotencyKey }),
   });
   const body = await response.text();
   if (!response.ok) {
@@ -313,6 +535,7 @@ async function sendWhatsappPayload(payload: Record<string, unknown>) {
   let result: Record<string, unknown> = {
     status: "sent",
     providerStatus: response.status,
+    idempotencyKey,
   };
   try {
     result = { ...result, ...(JSON.parse(body) as Record<string, unknown>) };
@@ -327,59 +550,45 @@ export async function executeApprovedWhatsapp(
   actor: ActorContext,
   tool?: string,
 ) {
-  const approval = await getApproval(id);
-  if (approval.actionType !== "WHATSAPP_SEND") {
-    throw new DomainError("Approval is not a WhatsApp send", "INVALID_APPROVAL_ACTION", 422);
+  const claim = await claimApprovalForExecution(id, { actionType: "WHATSAPP_SEND" });
+  if (claim.alreadyExecuted) {
+    return { approval: claim.approval, result: claim.approval.executionResult };
   }
-  if (approval.status !== "APPROVED") {
-    throw new DomainError(
-      "Approval must be approved before execution",
-      "APPROVAL_NOT_APPROVED",
-      409,
-    );
-  }
-  ensureApprovalNotExpired(approval);
-  if (approval.payloadHash !== hashPayload(approval.payload)) {
-    throw new DomainError(
-      "Approved payload integrity check failed",
-      "APPROVAL_PAYLOAD_MISMATCH",
-      409,
-    );
-  }
-  if (approval.policyChecks.some((check) => !check.passed)) {
-    throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
-  }
-  if (approval.leadId) {
-    const current = await getLead(approval.leadId);
-    if (current.lead.doNotContact || current.lead.status === "DO_NOT_CONTACT") {
-      throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
-    }
-  }
-  const result = await sendWhatsappPayload(approval.payload);
-  const updated = await repo().updateApproval(id, approval.version, {
-    status: "EXECUTED",
-    executedAt: nowIso(),
-    executionResult: result,
-  });
-  if (!updated) throwVersionConflict("Approval");
-  await automationAudit(
-    actor,
-    "whatsapp.send.approved",
-    "approval",
-    id,
-    { payloadHash: approval.payloadHash },
-    { result },
-    approval.leadId,
-    tool,
-  );
-  if (approval.leadId) {
-    await leadRepo().addActivity({
-      leadId: approval.leadId,
-      type: "AGENT_ACTION",
+
+  try {
+    const result = await sendWhatsappPayload(claim.approval.payload, claim.approval.id);
+    const updated = await completeApprovalExecution(claim.approval, result);
+    await automationAudit(
       actor,
-      summary: "WhatsApp enviado após aprovação humana: " + approval.preview.slice(0, 180),
-      metadata: { approvalId: id, result },
-    });
+      "whatsapp.send.approved",
+      "approval",
+      id,
+      { payloadHash: claim.approval.payloadHash, idempotencyKey: claim.approval.id },
+      { result },
+      claim.approval.leadId,
+      tool,
+    );
+    if (claim.approval.leadId) {
+      await leadRepo().addActivity({
+        leadId: claim.approval.leadId,
+        type: "AGENT_ACTION",
+        actor,
+        summary: "WhatsApp enviado após aprovação humana: " + claim.approval.preview.slice(0, 180),
+        metadata: { approvalId: id, result },
+      });
+    }
+    return { approval: updated, result };
+  } catch (error) {
+    await automationAudit(
+      actor,
+      "whatsapp.send.execution_uncertain",
+      "approval",
+      id,
+      { idempotencyKey: claim.approval.id },
+      { error: error instanceof Error ? error.message : "Unknown execution failure" },
+      claim.approval.leadId,
+      tool,
+    );
+    throw error;
   }
-  return { approval: updated, result };
 }
