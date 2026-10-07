@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState } from "react";
 import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, type LeadStatus, type UserSummary } from "@/lib/domain/types";
-import { statusMessageKey } from "@/lib/i18n/domain";
+import { serviceMessageKey, statusMessageKey } from "@/lib/i18n/domain";
 import { ModalShell } from "./modal-shell";
 import { useI18n } from "./i18n-provider";
 import { buttonGhostClass, buttonPrimaryClass, buttonSecondaryClass, controlClass } from "./ui-kit";
@@ -27,7 +27,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
   const chips = [
     values.status ? [t("leads.stage"), t(statusMessageKey(values.status as LeadStatus))] : null,
     values.owner ? [t("leads.owner"), ownerLabel ?? values.owner] : null,
-    values.opportunity ? [t("leads.opportunity"), values.opportunity.replaceAll("_", " ")] : null,
+    values.opportunity ? [t("leads.opportunity"), t(serviceMessageKey(values.opportunity as (typeof SERVICE_OPPORTUNITIES)[number]))] : null,
     values.segment ? [t("leads.segment"), values.segment] : null,
     values.city ? [t("leads.city"), values.city] : null,
     values.scoreMin ? [t("leads.scoreMin"), values.scoreMin] : null,
@@ -35,7 +35,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
   ].filter(Boolean) as string[][];
 
   const advancedFields = <>
-    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.opportunity")}</span><select name="opportunity" defaultValue={values.opportunity ?? ""} className={controlClass}><option value="">{t("leads.allOpportunities")}</option>{SERVICE_OPPORTUNITIES.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label>
+    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.opportunity")}</span><select name="opportunity" defaultValue={values.opportunity ?? ""} className={controlClass}><option value="">{t("leads.allOpportunities")}</option>{SERVICE_OPPORTUNITIES.map((item) => <option key={item} value={item}>{t(serviceMessageKey(item))}</option>)}</select></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.segment")}</span><input name="segment" defaultValue={values.segment} placeholder={t("leads.segmentPlaceholder")} className={controlClass}/></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.city")}</span><input name="city" defaultValue={values.city} placeholder={t("leads.cityPlaceholder")} className={controlClass}/></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.scoreMin")}</span><input name="scoreMin" type="number" min="0" max="100" defaultValue={values.scoreMin} placeholder="0–100" className={controlClass}/></label>
