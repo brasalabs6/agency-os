@@ -25,8 +25,8 @@ export function TeamSettings({initialUsers,currentUserId}:{initialUsers:PublicUs
   function upsert(user:PublicUser){setUsers((current)=>current.some((item)=>item.id===user.id)?current.map((item)=>item.id===user.id?user:item):[...current,user]);}
   async function action(id:string,fn:()=>Promise<PublicUser>,ok:string){
     setBusy(id);setError(null);setMessage(null);
-    try{upsert(await fn());setMessage(ok);}
-    catch(e){setError(e instanceof Error?e.message:t("common.errorUnexpected"));}
+    try{upsert(await fn());setMessage(ok);return true;}
+    catch(e){setError(e instanceof Error?e.message:t("common.errorUnexpected"));return false;}
     finally{setBusy(null);}
   }
 
@@ -60,14 +60,14 @@ export function TeamSettings({initialUsers,currentUserId}:{initialUsers:PublicUs
     {(message||error)?<div className={`rounded-lg border px-3 py-2 text-xs ${error?"border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300":"border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300"}`}>{error??message}</div>:null}
 
     <ModalShell open={Boolean(editingUser)} onClose={()=>setEditingUser(null)} title={t("team.editMember")} sizeClass="sm:max-w-lg">
-      {editingUser?<form className="p-4 sm:p-5" onSubmit={(event)=>{event.preventDefault();const d=new FormData(event.currentTarget);void action(editingUser.id,()=>req(`/api/team/${editingUser.id}`,"PATCH",{name:d.get("name"),email:d.get("email")}),t("team.updated")).then(()=>setEditingUser(null));}}>
+      {editingUser?<form className="p-4 sm:p-5" onSubmit={async(event)=>{event.preventDefault();const d=new FormData(event.currentTarget);if(await action(editingUser.id,()=>req(`/api/team/${editingUser.id}`,"PATCH",{name:d.get("name"),email:d.get("email")}),t("team.updated")))setEditingUser(null);}}>
         <div className="space-y-4"><label className="block text-xs font-medium">{t("team.name")}<input name="name" defaultValue={editingUser.name} required className={`mt-1.5 ${controlClass}`}/></label><label className="block text-xs font-medium">Email<input name="email" defaultValue={editingUser.email} type="email" required className={`mt-1.5 ${controlClass}`}/></label></div>
         <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t border-default bg-[var(--panel)] pt-3 pb-[env(safe-area-inset-bottom)]"><button type="button" className={buttonGhostClass} onClick={()=>setEditingUser(null)}>{t("common.cancel")}</button><button disabled={busy===editingUser.id} className={buttonPrimaryClass}>{t("common.save")}</button></div>
       </form>:null}
     </ModalShell>
 
     <ModalShell open={Boolean(resetUser)} onClose={()=>setResetUser(null)} title={t("team.resetTitle")} description={resetUser?.name} sizeClass="sm:max-w-lg">
-      {resetUser?<form className="p-4 sm:p-5" onSubmit={(event)=>{event.preventDefault();const d=new FormData(event.currentTarget);void action(resetUser.id,()=>req(`/api/team/${resetUser.id}/reset-password`,"POST",{password:d.get("password")}),t("team.passwordReset")).then(()=>setResetUser(null));}}>
+      {resetUser?<form className="p-4 sm:p-5" onSubmit={async(event)=>{event.preventDefault();const d=new FormData(event.currentTarget);if(await action(resetUser.id,()=>req(`/api/team/${resetUser.id}/reset-password`,"POST",{password:d.get("password")}),t("team.passwordReset")))setResetUser(null);}}>
         <label className="block text-xs font-medium">{t("team.temporaryPassword")}<input name="password" type="password" minLength={10} maxLength={128} required className={`mt-1.5 ${controlClass}`}/><span className="mt-1.5 block text-xs text-muted">{t("team.passwordHint")}</span></label>
         <div className="sticky bottom-0 mt-5 flex justify-end gap-2 border-t border-default bg-[var(--panel)] pt-3 pb-[env(safe-area-inset-bottom)]"><button type="button" className={buttonGhostClass} onClick={()=>setResetUser(null)}>{t("common.cancel")}</button><button disabled={busy===resetUser.id} className={buttonPrimaryClass}>{t("team.resetPassword")}</button></div>
       </form>:null}
