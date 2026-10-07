@@ -1,4 +1,4 @@
-import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { ActivityType, ActorType, LeadStatus, LeadTaskPriority, LeadTaskStatus, LeadTaskType, ServiceOpportunity, UserRole } from "@/lib/domain/types";
 import type { AiRunStatus, ApprovalActionType, ApprovalStatus, ClientProjectStatus, ContractStatus, DiagnosticStatus, ObligationStatus, ProposalStatus } from "@/lib/domain/automation";
@@ -300,6 +300,7 @@ export const conversations = pgTable("conversations", {
 }, (t) => [
   index("conversations_lead_idx").on(t.leadId),
   index("conversations_connection_idx").on(t.connectionId),
+  uniqueIndex("conversations_connection_external_uidx").on(t.connectionId, t.externalId),
   index("conversations_last_message_idx").on(t.lastMessageAt),
 ]);
 
@@ -315,7 +316,7 @@ export const channelMessages = pgTable("channel_messages", {
   deliveryStatus: text("delivery_status"),
   rawMetadata: jsonb("raw_metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("channel_messages_conversation_idx").on(t.conversationId), index("channel_messages_sent_idx").on(t.sentAt)]);
+}, (t) => [index("channel_messages_conversation_idx").on(t.conversationId), uniqueIndex("channel_messages_conversation_external_uidx").on(t.conversationId, t.externalId), index("channel_messages_sent_idx").on(t.sentAt)]);
 
 export const approvalRequests = pgTable("approval_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -432,7 +433,7 @@ export const clientProjects = pgTable("client_projects", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("client_projects_lead_idx").on(t.leadId), index("client_projects_contract_idx").on(t.contractId), index("client_projects_status_idx").on(t.status)]);
+}, (t) => [index("client_projects_lead_idx").on(t.leadId), uniqueIndex("client_projects_contract_uidx").on(t.contractId), index("client_projects_status_idx").on(t.status)]);
 
 export const projectObligations = pgTable("project_obligations", {
   id: uuid("id").primaryKey().defaultRandom(),
