@@ -1,5 +1,8 @@
-import { STATUS_LABELS } from "@/lib/domain/status";
+"use client";
+
 import type { LeadStatus } from "@/lib/domain/types";
+import { statusMessageKey } from "@/lib/i18n/domain";
+import { useI18n } from "./i18n-provider";
 
 const tones: Record<LeadStatus, string> = {
   DISCOVERED: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
@@ -21,5 +24,6 @@ const tones: Record<LeadStatus, string> = {
 };
 
 export function StatusBadge({ status }: { status: LeadStatus }) {
-  return <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium ${tones[status]}`}><span className="status-dot" />{STATUS_LABELS[status]}</span>;
+  const { t } = useI18n();
+  return <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${tones[status]}`}><span className="status-dot"/>{t(statusMessageKey(status))}</span>;
 }
