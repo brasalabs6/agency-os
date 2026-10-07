@@ -190,8 +190,24 @@ async function validateExternalTarget(
   const delivery = payload.delivery && typeof payload.delivery === "object"
     ? payload.delivery as { channel?: string; to?: string }
     : null;
+  const isDocumentSend = actionType === "PROPOSAL_SEND" || actionType === "CONTRACT_SEND";
+  if (isDocumentSend && (!delivery?.channel || !delivery.to)) {
+    throw new DomainError(
+      "Document approval requires a delivery channel and target",
+      "DELIVERY_TARGET_REQUIRED",
+      422,
+    );
+  }
   const channel = directChannel ?? delivery?.channel ?? null;
   const rawTarget = directChannel ? String(payload.to ?? "") : String(delivery?.to ?? "");
+
+  if (actionType === "WHATSAPP_SEND" && !String(payload.text ?? "").trim()) {
+    throw new DomainError(
+      "WhatsApp approval requires non-empty text",
+      "INVALID_WHATSAPP_PAYLOAD",
+      422,
+    );
+  }
 
   if (channel !== "WHATSAPP" && channel !== "EMAIL") return;
   if (!leadId) {
@@ -357,13 +373,10 @@ function assertSpecializedApprovalEdit(
 
 export async function approveRequest(
   id: string,
-  input: { expectedVersion?: number; payload?: Record<string, unknown>; preview?: string },
+  input: { expectedVersion: number; payload?: Record<string, unknown>; preview?: string },
   actor: ActorContext,
 ) {
   requireApprovalActor(actor);
-  if (input.expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
-  }
   const before = await getApproval(id);
   if (before.status !== "PENDING") {
     throw new DomainError("Approval is not pending", "APPROVAL_NOT_PENDING", 409);
@@ -422,13 +435,10 @@ async function reopenRejectedSpecializedEntity(approval: ApprovalRequest) {
 
 export async function rejectRequest(
   id: string,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
 ) {
   requireApprovalActor(actor);
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
-  }
   const before = await getApproval(id);
   if (before.status !== "PENDING") {
     throw new DomainError("Approval is not pending", "APPROVAL_NOT_PENDING", 409);
