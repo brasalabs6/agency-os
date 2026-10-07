@@ -47,13 +47,14 @@ status must pass           for Quality Gate = green
 
 File: `.github/workflows/ci.yml`
 
-The required application-quality check is named **Quality Gate**.
+The required application-quality check is named **Quality Gate**. Push CI runs only on `main`; feature branches are validated by the pull-request event, avoiding duplicate `push` + `pull_request` runs for the same commit.
 
 It runs:
 
 - `npm ci`
+- `npm audit --omit=dev --audit-level=high`
 - migration sequence validation
-- `npm run lint`
+- lint with `--max-warnings=0`
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
@@ -64,6 +65,8 @@ On pull requests it also waits for Vercel's **Vercel** commit status, producing 
 ### Production Smoke
 
 File: `.github/workflows/post-deploy-smoke.yml`
+
+The workflow is filtered to `main` at the `workflow_run` trigger, so feature-branch and pull-request CI runs do not create noisy skipped smoke workflows.
 
 After a successful CI run on `main`, it waits for Vercel production and then verifies:
 
@@ -85,7 +88,9 @@ as its Ignored Build Step command.
 
 For preview branches the script allows builds immediately.
 
-For `main`, it polls GitHub for the **Quality Gate** check attached to the exact commit. Vercel proceeds only after that check succeeds. If CI fails or does not complete inside the gate window, the production deployment is ignored.
+For `main`, it polls the GitHub Actions workflow runs API for the newest `CI` run that is simultaneously `push`, `main`, and the exact deployment SHA. Vercel proceeds only after that run succeeds.
+
+The gate is fail-closed: GitHub API failures, rate limits, malformed responses, unknown states, CI failures, and timeouts all return the Vercel “ignore deployment” exit code. This means a network/API failure cannot accidentally release production.
 
 This means even a direct push to `main` does not automatically become production.
 
@@ -119,7 +124,7 @@ The GitHub connector used to implement this pipeline does not have repository ad
 
 ## Failure behavior
 
-- Lint/type/test/build failure: **Quality Gate** fails and Vercel production is ignored.
+- Production dependency high/critical vulnerability, lint warning/error, type/test/build failure: **Quality Gate** fails and Vercel production is ignored.
 - Vercel Preview failure: **Vercel Preview** fails on the PR.
 - Vercel production build failure: the previous production alias remains live.
 - Wrong production SHA: **Production Smoke** fails.
