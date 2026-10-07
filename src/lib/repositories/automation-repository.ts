@@ -47,7 +47,10 @@ export interface AutomationRepository {
   updateApproval(id: string, expectedVersion: number | undefined, changes: Partial<ApprovalRequest>): Promise<ApprovalRequest | null>;
 
   getQualification(leadId: string): Promise<Qualification | null>;
-  upsertQualification(input: Omit<Qualification, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<Qualification>;
+  upsertQualification(
+    input: Omit<Qualification, "id" | "createdAt" | "updatedAt"> & { id?: string },
+    expectedVersion?: number,
+  ): Promise<Qualification | null>;
 
   listProposals(leadId: string): Promise<Proposal[]>;
   getProposal(id: string): Promise<Proposal | null>;
