@@ -8,6 +8,86 @@ import { automationAudit, nowIso } from "./automation-utils";
 
 const repo = () => getAutomationRepository();
 
+type NewObligation = Omit<ProjectObligation, "id" | "createdAt" | "updatedAt" | "projectId">;
+
+function expectedObligations(contract: Awaited<ReturnType<typeof getContract>>): NewObligation[] {
+  const items: NewObligation[] = [];
+
+  contract.deliverables.forEach((title, index) => {
+    items.push({
+      sourceContractId: contract.id,
+      sourceKey: "deliverable:" + index,
+      party: "AGENCY",
+      kind: "DELIVERABLE",
+      title,
+      status: "TODO",
+      description: null,
+      dueAt: null,
+      metadata: {},
+    });
+  });
+
+  contract.responsibilitiesAgency.forEach((title, index) => {
+    if (!contract.deliverables.includes(title)) {
+      items.push({
+        sourceContractId: contract.id,
+        sourceKey: "agency-responsibility:" + index,
+        party: "AGENCY",
+        kind: "OTHER",
+        title,
+        status: "TODO",
+        description: null,
+        dueAt: null,
+        metadata: {},
+      });
+    }
+  });
+
+  contract.responsibilitiesClient.forEach((title, index) => {
+    items.push({
+      sourceContractId: contract.id,
+      sourceKey: "client-dependency:" + index,
+      party: "CLIENT",
+      kind: "DEPENDENCY",
+      title,
+      status: "TODO",
+      description: null,
+      dueAt: null,
+      metadata: {},
+    });
+  });
+
+  contract.paymentObligations.forEach((payment, index) => {
+    items.push({
+      sourceContractId: contract.id,
+      sourceKey: "payment:" + index,
+      party: "CLIENT",
+      kind: "PAYMENT",
+      title: String(payment.title ?? "Pagamento contratual"),
+      status: "TODO",
+      description: String(payment.description ?? ""),
+      dueAt: typeof payment.dueAt === "string" ? payment.dueAt : null,
+      metadata: payment,
+    });
+  });
+
+  contract.supportObligations.forEach((title, index) => {
+    items.push({
+      sourceContractId: contract.id,
+      sourceKey: "support:" + index,
+      party: "AGENCY",
+      kind: "SUPPORT",
+      title,
+      status: "TODO",
+      description: null,
+      dueAt: null,
+      metadata: {},
+    });
+  });
+
+  return items;
+}
+
 export async function createProjectFromSignedContract(
   contractId: string,
   input: { name?: string; ownerUserId?: string | null; targetAt?: string | null },
@@ -22,10 +102,9 @@ export async function createProjectFromSignedContract(
       422,
     );
   }
-  const existing = await repo().getProjectByContract(contractId);
-  if (existing) return existing;
+
   const lead = await getLead(contract.leadId);
-  const project = await repo().createProject({
+  const project = (await repo().getProjectByContract(contractId)) ?? await repo().createProject({
     leadId: contract.leadId,
     contractId,
     name: input.name ?? lead.lead.name,
@@ -36,88 +115,35 @@ export async function createProjectFromSignedContract(
     completedAt: null,
   });
 
-  for (const title of contract.deliverables) {
+  const existing = await repo().listObligations(project.id);
+  const existingKeys = new Set(existing.map((item) => item.sourceKey));
+  let createdCount = 0;
+  for (const obligation of expectedObligations(contract)) {
+    if (existingKeys.has(obligation.sourceKey)) continue;
     await repo().createObligation({
       projectId: project.id,
-      sourceContractId: contract.id,
-      party: "AGENCY",
-      kind: "DELIVERABLE",
-      title,
-      status: "TODO",
-      description: null,
-      dueAt: null,
-      metadata: {},
+      ...obligation,
     });
-  }
-  for (const title of contract.responsibilitiesAgency) {
-    if (!contract.deliverables.includes(title)) {
-      await repo().createObligation({
-        projectId: project.id,
-        sourceContractId: contract.id,
-        party: "AGENCY",
-        kind: "OTHER",
-        title,
-        status: "TODO",
-        description: null,
-        dueAt: null,
-        metadata: {},
-      });
-    }
-  }
-  for (const title of contract.responsibilitiesClient) {
-    await repo().createObligation({
-      projectId: project.id,
-      sourceContractId: contract.id,
-      party: "CLIENT",
-      kind: "DEPENDENCY",
-      title,
-      status: "TODO",
-      description: null,
-      dueAt: null,
-      metadata: {},
-    });
-  }
-  for (const payment of contract.paymentObligations) {
-    await repo().createObligation({
-      projectId: project.id,
-      sourceContractId: contract.id,
-      party: "CLIENT",
-      kind: "PAYMENT",
-      title: String(payment.title ?? "Pagamento contratual"),
-      status: "TODO",
-      description: String(payment.description ?? ""),
-      dueAt: typeof payment.dueAt === "string" ? payment.dueAt : null,
-      metadata: payment,
-    });
-  }
-  for (const title of contract.supportObligations) {
-    await repo().createObligation({
-      projectId: project.id,
-      sourceContractId: contract.id,
-      party: "AGENCY",
-      kind: "SUPPORT",
-      title,
-      status: "TODO",
-      description: null,
-      dueAt: null,
-      metadata: {},
-    });
+    existingKeys.add(obligation.sourceKey);
+    createdCount += 1;
   }
 
   const current = await getLead(contract.leadId);
   if (current.lead.status === "WON") {
     await moveLeadStage(contract.leadId, "ONBOARDING", actor, {
-      reason: "Client project created from signed contract",
+      reason: "Client project reconciled from signed contract",
       tool,
     });
   }
+
+  const obligations = await repo().listObligations(project.id);
   await automationAudit(
     actor,
     "project.create_from_contract",
     "client_project",
     project.id,
     { contractId },
-    { obligations: (await repo().listObligations(project.id)).length },
+    { obligations: obligations.length, obligationsCreated: createdCount },
     contract.leadId,
     tool,
   );
