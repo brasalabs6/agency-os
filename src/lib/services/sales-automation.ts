@@ -215,6 +215,10 @@ export async function executeApprovedProposal(
   }
   const proposalId = String(approval.payload.proposalId ?? "");
   const proposal = await getProposal(proposalId);
+  const currentLead = await getLead(proposal.leadId);
+  if (currentLead.lead.doNotContact || currentLead.lead.status === "DO_NOT_CONTACT") {
+    throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
+  }
   if (Number(approval.payload.version) !== proposal.version) {
     throw new DomainError(
       "Proposal changed after approval request",
@@ -450,6 +454,10 @@ export async function executeApprovedContract(
   }
   const contractId = String(approval.payload.contractId ?? "");
   const contract = await getContract(contractId);
+  const currentLead = await getLead(contract.leadId);
+  if (currentLead.lead.doNotContact || currentLead.lead.status === "DO_NOT_CONTACT") {
+    throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
+  }
   if (Number(approval.payload.version) !== contract.version) {
     throw new DomainError(
       "Contract changed after approval request",
