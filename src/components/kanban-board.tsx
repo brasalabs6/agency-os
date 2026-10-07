@@ -52,14 +52,14 @@ export function KanbanBoard({ initialLeads }: { initialLeads: Lead[] }) {
   }
 
   return <>
-    <div className="lg:hidden">
+    <div data-testid="mobile-pipeline" className="lg:hidden">
       <div className="scrollbar-thin -mx-3 mb-3 overflow-x-auto px-3 sm:-mx-4 sm:px-4">
         <div className="flex w-max gap-2 pb-1">{groups.map((group) => <button key={group.id} onClick={() => setSelectedGroupId(group.id)} className={`focus-ring min-h-11 whitespace-nowrap rounded-full border px-3 text-sm font-medium ${selectedGroupId === group.id ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-default bg-[var(--panel)] text-muted"}`}>{t(pipelineGroupMessageKey(group.id))}<span className="ml-2 font-mono text-xs">{group.leads.length}</span></button>)}</div>
       </div>
       {renderColumn(selectedGroup, true)}
     </div>
 
-    <div className="scrollbar-thin -mx-1 hidden snap-x snap-mandatory overflow-x-auto px-1 pb-4 lg:block 2xl:overflow-visible">
+    <div data-testid="desktop-pipeline" className="scrollbar-thin -mx-1 hidden snap-x snap-mandatory overflow-x-auto px-1 pb-4 lg:block 2xl:overflow-visible">
       <div className="grid grid-flow-col auto-cols-[300px] gap-3 2xl:grid-flow-row 2xl:grid-cols-7 2xl:auto-cols-auto">{groups.map((group) => renderColumn(group, false))}</div>
     </div>
   </>;
