@@ -27,6 +27,7 @@ const ptBR = {
   "common.previousPeriod": "Período anterior",
   "common.nextPeriod": "Próximo período",
   "common.language": "Idioma",
+  "common.errorUnexpected": "Erro inesperado",
   "common.portuguese": "Português",
   "common.english": "English",
 
@@ -96,6 +97,9 @@ const ptBR = {
   "leads.activeFilters": "Filtros ativos",
   "leads.service": "Oportunidade",
   "leads.scoreMin": "Score mínimo",
+  "leads.allOpportunities": "Todas",
+  "leads.segmentPlaceholder": "Ex.: restaurante",
+  "leads.cityPlaceholder": "Ex.: Brasília",
   "leads.quickView": "Visão rápida",
   "leads.none": "Nenhuma",
   "leads.highScore": "Score alto",
@@ -207,6 +211,12 @@ const ptBR = {
   "tasks.task": "Tarefa",
   "tasks.lead": "Lead",
   "tasks.priority": "Prioridade",
+  "tasks.add": "Adicionar",
+  "tasks.checklistDescription": "Checklist operacional vinculado ao lead.",
+  "tasks.emptyLead": "Nenhuma tarefa. Crie o próximo passo deste lead.",
+  "tasks.moveUp": "Mover {title} para cima",
+  "tasks.moveDown": "Mover {title} para baixo",
+  "tasks.cancel": "Cancelar {title}",
 
   "taskForm.edit": "Editar tarefa",
   "taskForm.new": "Nova tarefa",
@@ -389,6 +399,9 @@ const ptBR = {
 
   "date.today": "Hoje, {time}",
   "date.noDate": "Sem data",
+  "score.high": "Alta",
+  "score.medium": "Média",
+  "score.low": "Baixa",
 } as const;
 
 export type MessageKey = keyof typeof ptBR;
@@ -418,6 +431,7 @@ const en: Record<MessageKey, string> = {
   "common.previousPeriod": "Previous period",
   "common.nextPeriod": "Next period",
   "common.language": "Language",
+  "common.errorUnexpected": "Unexpected error",
   "common.portuguese": "Português",
   "common.english": "English",
 
@@ -487,6 +501,9 @@ const en: Record<MessageKey, string> = {
   "leads.activeFilters": "Active filters",
   "leads.service": "Opportunity",
   "leads.scoreMin": "Minimum score",
+  "leads.allOpportunities": "All",
+  "leads.segmentPlaceholder": "E.g. restaurant",
+  "leads.cityPlaceholder": "E.g. Brasília",
   "leads.quickView": "Quick view",
   "leads.none": "None",
   "leads.highScore": "High score",
@@ -598,6 +615,12 @@ const en: Record<MessageKey, string> = {
   "tasks.task": "Task",
   "tasks.lead": "Lead",
   "tasks.priority": "Priority",
+  "tasks.add": "Add",
+  "tasks.checklistDescription": "Operational checklist linked to the lead.",
+  "tasks.emptyLead": "No tasks yet. Create this lead’s next step.",
+  "tasks.moveUp": "Move {title} up",
+  "tasks.moveDown": "Move {title} down",
+  "tasks.cancel": "Cancel {title}",
 
   "taskForm.edit": "Edit task",
   "taskForm.new": "New task",
@@ -780,6 +803,9 @@ const en: Record<MessageKey, string> = {
 
   "date.today": "Today, {time}",
   "date.noDate": "No date",
+  "score.high": "High",
+  "score.medium": "Medium",
+  "score.low": "Low",
 };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = {
