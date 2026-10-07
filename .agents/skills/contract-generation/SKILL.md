@@ -18,11 +18,11 @@ Gerar contrato draft vinculado à proposta exata.
 - `contract_send_approved`
 
 ## Workflow
-1. Confirme Proposal version/status.
+1. Confirme que a Proposal está `ACCEPTED` e passe exatamente seu `proposalVersion` ao criar o contrato.
 2. Selecione template/version corretos.
 3. Preencha partes, escopo, payment, revisões, suporte, PI e responsabilidades.
 4. Sinalize campos/políticas faltantes; não invente termos.
-5. Solicite revisão humana/jurídica antes do envio.
+5. Releia o contrato DRAFT, use seu `version` como `expectedVersion` e solicite revisão humana/jurídica antes do envio; depois disso o conteúdo da revisão fica imutável.
 
 ## Guardrails
 - Preserve sources and distinguish facts from inference.
