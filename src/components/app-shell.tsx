@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Bot, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Activity, Bot, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X, Search, ShieldCheck, MessageCircle } from "lucide-react";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -14,6 +14,9 @@ const nav = [
   { href: "/tasks", label: "Tarefas", icon: CheckSquare2 },
   { href: "/calendar", label: "Calendário", icon: CalendarDays },
   { href: "/actions", label: "Ações pendentes", icon: ListTodo },
+  { href: "/prospecting", label: "Prospecção IA", icon: Search },
+  { href: "/conversations", label: "WhatsApp", icon: MessageCircle },
+  { href: "/approvals", label: "Aprovações", icon: ShieldCheck },
 ];
 
 function isActive(pathname: string, href: string) {
