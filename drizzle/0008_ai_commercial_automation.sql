@@ -240,6 +240,9 @@ CREATE TABLE IF NOT EXISTS public.contracts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_id uuid NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
   proposal_id uuid NOT NULL REFERENCES public.proposals(id) ON DELETE RESTRICT,
+  proposal_version integer NOT NULL,
+  proposal_snapshot_hash text NOT NULL,
+  proposal_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
   template_id text NOT NULL,
   template_version text NOT NULL,
   version integer NOT NULL DEFAULT 1,
@@ -288,6 +291,7 @@ CREATE TABLE IF NOT EXISTS public.project_obligations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id uuid NOT NULL REFERENCES public.client_projects(id) ON DELETE CASCADE,
   source_contract_id uuid NOT NULL REFERENCES public.contracts(id) ON DELETE RESTRICT,
+  source_key text NOT NULL,
   party text NOT NULL,
   kind text NOT NULL,
   title text NOT NULL,
@@ -299,6 +303,7 @@ CREATE TABLE IF NOT EXISTS public.project_obligations (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS project_obligations_project_idx ON public.project_obligations(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS project_obligations_project_source_uidx ON public.project_obligations(project_id, source_key);
 CREATE INDEX IF NOT EXISTS project_obligations_status_idx ON public.project_obligations(status);
 CREATE INDEX IF NOT EXISTS project_obligations_due_idx ON public.project_obligations(due_at);
 
