@@ -24,13 +24,14 @@ import {
   updateProposal,
 } from "@/lib/services/sales-automation";
 import { createProjectFromSignedContract } from "@/lib/services/client-projects";
-import { createDiagnostic } from "@/lib/services/intelligence";
+import { approveDiagnostic, createDiagnostic, finalizeDiagnostic, updateDiagnostic } from "@/lib/services/intelligence";
 import { hashPayload } from "@/lib/services/automation-utils";
 
 const previous = {
   driver: process.env.DATA_DRIVER,
   whatsapp: process.env.WHATSAPP_SEND_MODE,
   document: process.env.DOCUMENT_SEND_MODE,
+  lease: process.env.APPROVAL_EXECUTION_LEASE_SECONDS,
 };
 
 const admin: ActorContext = {
@@ -60,6 +61,8 @@ afterEach(() => {
   else process.env.WHATSAPP_SEND_MODE = previous.whatsapp;
   if (previous.document === undefined) delete process.env.DOCUMENT_SEND_MODE;
   else process.env.DOCUMENT_SEND_MODE = previous.document;
+  if (previous.lease === undefined) delete process.env.APPROVAL_EXECUTION_LEASE_SECONDS;
+  else process.env.APPROVAL_EXECUTION_LEASE_SECONDS = previous.lease;
 });
 
 async function makeLead(status: "QUALIFIED" | "READY_TO_CONTACT" = "QUALIFIED") {
@@ -122,6 +125,37 @@ describe("commercial automation regressions", () => {
     const left = { b: 2, a: { z: 3, y: [2, { b: 1, a: 0 }] } };
     const right = { a: { y: [2, { a: 0, b: 1 }], z: 3 }, b: 2 };
     expect(hashPayload(left)).toBe(hashPayload(right));
+  });
+
+  it("makes finalized/approved diagnostics immutable", async () => {
+    const lead = await makeLead();
+    const draft = await createDiagnostic(lead.id, {
+      executiveSummary: "Diagnóstico",
+      strengths: [],
+      gaps: [],
+      recommendations: [],
+      scores: {},
+      recommendedServices: [],
+    }, agent, "test");
+    const ready = await finalizeDiagnostic(draft.id, draft.version, agent, "test");
+    expect(ready.status).toBe("READY");
+
+    await expect(updateDiagnostic(
+      ready.id,
+      { executiveSummary: "mutação indevida" },
+      ready.version,
+      agent,
+      "test",
+    )).rejects.toMatchObject({ code: "DIAGNOSTIC_NOT_EDITABLE" });
+
+    const approved = await approveDiagnostic(ready.id, ready.version, admin);
+    expect(approved.status).toBe("APPROVED");
+    await expect(finalizeDiagnostic(
+      approved.id,
+      approved.version,
+      agent,
+      "test",
+    )).rejects.toMatchObject({ code: "DIAGNOSTIC_NOT_FINALIZABLE" });
   });
 
   it("blocks WhatsApp approvals that are unbound or target another recipient", async () => {
@@ -268,6 +302,43 @@ describe("commercial automation regressions", () => {
 
     const retry = await executeApprovedWhatsapp(approved.id, agent, "test");
     expect(retry.result).toMatchObject({
+      messageId: "mock_" + approved.id,
+      idempotencyKey: approved.id,
+    });
+  });
+
+  it("recovers a stale EXECUTING lease with the same idempotency key", async () => {
+    process.env.APPROVAL_EXECUTION_LEASE_SECONDS = "0";
+    const lead = await createLead({
+      name: "Lease recovery " + randomUUID(),
+      status: "READY_TO_CONTACT",
+      whatsapp: "+5561666666666",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
+    const pending = await createApprovalRequest({
+      leadId: lead.id,
+      actionType: "WHATSAPP_SEND",
+      payload: { to: "+5561666666666", text: "Recovery" },
+      preview: "Recovery",
+    }, agent);
+    const approved = await approveRequest(
+      pending.id,
+      { expectedVersion: pending.version },
+      admin,
+    );
+    const repo = getAutomationRepository();
+    const executing = await repo.updateApproval(approved.id, approved.version, {
+      status: "EXECUTING",
+      executionResult: {
+        idempotencyKey: approved.id,
+        startedAt: "2000-01-01T00:00:00.000Z",
+      },
+    });
+    expect(executing?.status).toBe("EXECUTING");
+
+    const recovered = await executeApprovedWhatsapp(approved.id, agent, "test");
+    expect(recovered.approval.status).toBe("EXECUTED");
+    expect(recovered.result).toMatchObject({
       messageId: "mock_" + approved.id,
       idempotencyKey: approved.id,
     });
