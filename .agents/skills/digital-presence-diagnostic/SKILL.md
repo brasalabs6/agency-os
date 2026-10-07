@@ -22,7 +22,7 @@ Gerar diagnóstico interno e público baseado em evidências.
 2. Transforme observações em strengths/gaps com severity/confidence.
 3. Associe evidenceIds e não trate gosto visual como fato.
 4. Marque publicSafe somente quando a conclusão for apropriada para o cliente.
-5. Finalize o diagnóstico para gerar versão renderizada.
+5. Atualize somente enquanto estiver DRAFT usando `expectedVersion`; finalize DRAFT → READY. Depois de READY, trate o artefato como imutável.
 
 ## Guardrails
 - Preserve sources and distinguish facts from inference.
