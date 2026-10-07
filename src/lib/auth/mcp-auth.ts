@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { ActorContext } from "@/lib/domain/types";
 import { DomainError } from "@/lib/domain/errors";
 import { resolveMcpCredentialSecret } from "@/lib/services/mcp-credentials";
+import { AGENT_SCOPES, type AgentScope } from "./scopes";
 
 function parseScopes(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
@@ -18,7 +19,7 @@ export async function authorizeMcpRequest(request: Request): Promise<ActorContex
 
   if (mode === "none") {
     if (process.env.NODE_ENV === "production") throw new DomainError("MCP no-auth mode is disabled in production", "MCP_AUTH_CONFIG_ERROR", 500);
-    return { type: "AGENT", id: "mcp-dev", name: "MCP Dev Client", scopes: ["leads.read", "leads.write"] };
+    return { type: "AGENT", id: "mcp-dev", name: "MCP Dev Client", scopes: [...AGENT_SCOPES] };
   }
 
   if (mode === "user_query_token") {
@@ -46,7 +47,7 @@ export async function authorizeMcpRequest(request: Request): Promise<ActorContex
   if (mode === "token") {
     const expected = process.env.MCP_API_TOKEN;
     if (!expected || token !== expected) throw new DomainError("Invalid MCP token", "MCP_UNAUTHORIZED", 401);
-    return { type: "AGENT", id: "mcp-token-client", name: "ChatGPT", scopes: ["leads.read", "leads.write"] };
+    return { type: "AGENT", id: "mcp-token-client", name: "ChatGPT", scopes: [...AGENT_SCOPES] };
   }
 
   if (mode === "oauth") {
@@ -70,6 +71,6 @@ export async function authorizeMcpRequest(request: Request): Promise<ActorContex
   throw new DomainError("Unsupported MCP_AUTH_MODE", "MCP_AUTH_CONFIG_ERROR", 500);
 }
 
-export function requireScope(actor: ActorContext, scope: "leads.read" | "leads.write") {
+export function requireScope(actor: ActorContext, scope: AgentScope) {
   if (!actor.scopes?.includes(scope)) throw new DomainError(`Missing scope: ${scope}`, "MCP_FORBIDDEN", 403);
 }
