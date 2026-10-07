@@ -19,9 +19,9 @@ Enviar WhatsApp somente após aprovação humana do payload exato.
 
 ## Workflow
 1. Monte draft usando contexto/evidências.
-2. Crie WHATSAPP_SEND approval com to/text/metadata.
+2. Crie WHATSAPP_SEND approval com `leadId` e `to` já registrado no lead ou em conversa vinculada; inclua text/metadata.
 3. Aguarde humano aprovar/editar.
-4. Execute somente approval APPROVED não expirado.
+4. Execute somente approval APPROVED não expirado; respeite `EXECUTING` e nunca tente contornar o lease/idempotency key.
 5. Registre contato e next action após receipt.
 
 ## Guardrails
