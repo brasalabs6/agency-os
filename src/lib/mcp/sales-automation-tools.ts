@@ -94,10 +94,10 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     title: "Request proposal send approval",
     description: "Create a human approval request before sending a priced proposal.",
     annotations: mcpWriteAnnotations,
-    inputSchema: z.object({ proposalId: z.string().uuid() }),
-  }, async ({ proposalId }) => {
+    inputSchema: z.object({ proposalId: z.string().uuid(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
+  }, async ({ proposalId, delivery }) => {
     requireScope(actor, "approvals.request");
-    return mcpTextResult(await requestProposalApproval(proposalId, actor, "proposal_request_approval"));
+    return mcpTextResult(await requestProposalApproval(proposalId, actor, "proposal_request_approval", delivery));
   });
 
   server.registerTool("proposal_send_approved", {
@@ -168,10 +168,10 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     title: "Request contract send approval",
     description: "Create mandatory human/legal review request before contract send.",
     annotations: mcpWriteAnnotations,
-    inputSchema: z.object({ contractId: z.string().uuid() }),
-  }, async ({ contractId }) => {
+    inputSchema: z.object({ contractId: z.string().uuid(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
+  }, async ({ contractId, delivery }) => {
     requireScope(actor, "approvals.request");
-    return mcpTextResult(await requestContractApproval(contractId, actor, "contract_request_approval"));
+    return mcpTextResult(await requestContractApproval(contractId, actor, "contract_request_approval", delivery));
   });
 
   server.registerTool("contract_send_approved", {
