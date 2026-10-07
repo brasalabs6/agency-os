@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 const agent: ActorContext = { type: "AGENT", id: "agent-test", name: "Agent", scopes: [] };
-const human: ActorContext = { type: "USER", id: "human-test", name: "Human", scopes: [] };
+const human: ActorContext = { type: "USER", id: "human-test", name: "Human", role: "ADMIN", scopes: ["approvals.approve"] };
 
 describe("approval security", () => {
   it("does not let an agent approve its own external action", async () => {
@@ -31,6 +31,19 @@ describe("approval security", () => {
     await expect(
       approveRequest(approval.id, { expectedVersion: approval.version }, agent),
     ).rejects.toMatchObject({ code: "HUMAN_APPROVAL_REQUIRED", status: 403 });
+  });
+
+  it("does not let a non-admin human approve external action", async () => {
+    process.env.DATA_DRIVER = "mock";
+    const member: ActorContext = { type: "USER", id: "member-test", name: "Member", role: "MEMBER", scopes: [] };
+    const approval = await createApprovalRequest({
+      actionType: "OTHER",
+      payload: { operation: "external" },
+      preview: "External action",
+    }, agent);
+    await expect(
+      approveRequest(approval.id, { expectedVersion: approval.version }, member),
+    ).rejects.toMatchObject({ code: "APPROVAL_PERMISSION_REQUIRED", status: 403 });
   });
 
   it("does not execute WhatsApp before approval", async () => {
