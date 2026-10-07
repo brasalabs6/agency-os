@@ -19,6 +19,8 @@ export default {
     timeout: 120_000,
     env: {
       ...process.env,
+      DATA_DRIVER: "mock",
+      APP_AUTH_DISABLED: "true",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },
