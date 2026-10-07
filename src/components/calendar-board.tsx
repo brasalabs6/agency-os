@@ -112,7 +112,7 @@ export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor,
   const edit = (task: LeadTaskView) => { setEditing(task); setDefaultDate(null); setFormOpen(true); };
 
   return <>
-    <div className="mb-4 lg:hidden">
+    <div data-testid="mobile-calendar-toolbar" className="mb-4 lg:hidden">
       <div className="flex items-center gap-2">
         <button onClick={() => navigate("agenda", shiftAnchor(anchor, "agenda", -1))} className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-default bg-[var(--panel)]" aria-label={t("common.previousPeriod")}><ChevronLeft size={17}/></button>
         <button onClick={() => navigate("agenda", dayKey(new Date()))} className={buttonSecondaryClass}>{t("common.today")}</button>
@@ -122,7 +122,7 @@ export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor,
       <div className="mt-3 grid grid-cols-[1fr_auto] gap-2"><div className="flex min-h-11 items-center rounded-lg border border-default bg-[var(--panel)] px-3 text-sm font-medium text-muted">{t("calendar.agenda")}</div><button onClick={() => { setEditing(null); setDefaultDate(null); setFormOpen(true); }} className={buttonPrimaryClass}><Plus size={15}/>{t("calendar.newTask")}</button></div>
     </div>
 
-    <div className="mb-4 hidden flex-col gap-3 lg:flex xl:flex-row xl:items-center xl:justify-between">
+    <div data-testid="desktop-calendar-toolbar" className="mb-4 hidden flex-col gap-3 lg:flex xl:flex-row xl:items-center xl:justify-between">
       <div className="flex min-w-0 items-center gap-2">
         <button onClick={() => navigate(view, shiftAnchor(anchor, view, -1))} className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-default bg-[var(--panel)] hover:bg-[var(--panel-2)]" aria-label={t("common.previousPeriod")}><ChevronLeft size={17}/></button>
         <button onClick={() => navigate(view, dayKey(new Date()))} className={buttonSecondaryClass}>{t("common.today")}</button>
@@ -137,7 +137,7 @@ export function CalendarBoard({ tasks: initialTasks, leads, users, view, anchor,
 
     {error ? <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</div> : null}
 
-    <div className="lg:hidden"><AgendaView anchor={anchorDate} byDay={byDay} onEdit={edit}/></div>
+    <div data-testid="mobile-calendar-agenda" className="lg:hidden"><AgendaView anchor={anchorDate} byDay={byDay} onEdit={edit}/></div>
     <div className="hidden lg:block">
       {view === "month" ? <MonthView anchor={anchorDate} byDay={byDay} onDrop={dropOn} onCreate={createAt} onEdit={edit} onDragStart={dragStart}/> : null}
       {view === "week" ? <WeekView anchor={anchorDate} byDay={byDay} onDrop={dropOn} onCreate={createAt} onEdit={edit} onDragStart={dragStart}/> : null}
