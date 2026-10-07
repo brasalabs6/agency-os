@@ -194,8 +194,8 @@ This tool is the first E2E check after connecting ChatGPT.
 Expected distinction:
 
 ```text
-Guilherme updated lead.
-ChatGPT · Guilherme created task.
+User A updated lead.
+ChatGPT · User A created task.
 Partner recorded call.
 ChatGPT · Partner added note.
 ```
