@@ -176,7 +176,7 @@ export async function updateDiagnostic(
   changes: Partial<Pick<Diagnostic,
     "executiveSummary" | "strengths" | "gaps" | "recommendations" | "scores" |
     "recommendedServices" | "internalNotes" | "publicSummary">>,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -188,9 +188,6 @@ export async function updateDiagnostic(
       409,
       { status: before.status },
     );
-  }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
   const updated = await repo().updateDiagnostic(id, expectedVersion, changes);
   if (!updated) throwVersionConflict("Diagnostic");
@@ -236,7 +233,7 @@ function renderDiagnosticMarkdown(item: Diagnostic) {
 
 export async function finalizeDiagnostic(
   id: string,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -248,9 +245,6 @@ export async function finalizeDiagnostic(
       409,
       { status: before.status },
     );
-  }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
   const updated = await repo().updateDiagnostic(id, expectedVersion, {
     status: "READY",
@@ -272,7 +266,7 @@ export async function finalizeDiagnostic(
 
 export async function approveDiagnostic(
   id: string,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
 ) {
   requireHumanActor(actor);
@@ -284,9 +278,6 @@ export async function approveDiagnostic(
       409,
       { status: before.status },
     );
-  }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
   const updated = await repo().updateDiagnostic(id, expectedVersion, { status: "APPROVED" });
   if (!updated) throwVersionConflict("Diagnostic");
