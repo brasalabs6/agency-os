@@ -1,4 +1,4 @@
-import type { LeadStatus, LeadTaskPriority, LeadTaskStatus, LeadTaskType } from "@/lib/domain/types";
+import type { LeadStatus, LeadTaskPriority, LeadTaskStatus, LeadTaskType, ServiceOpportunity } from "@/lib/domain/types";
 import type { MessageKey } from "./messages";
 
 export function statusMessageKey(status: LeadStatus): MessageKey {
@@ -19,4 +19,8 @@ export function taskStatusMessageKey(status: LeadTaskStatus): MessageKey {
 
 export function pipelineGroupMessageKey(groupId: string): MessageKey {
   return `pipelineGroup.${groupId}` as MessageKey;
+}
+
+export function serviceMessageKey(service: ServiceOpportunity): MessageKey {
+  return `service.${service}` as MessageKey;
 }
