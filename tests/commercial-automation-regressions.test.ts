@@ -124,6 +124,27 @@ describe("commercial automation regressions", () => {
     expect(hashPayload(left)).toBe(hashPayload(right));
   });
 
+  it("blocks WhatsApp approvals that are unbound or target another recipient", async () => {
+    await expect(createApprovalRequest({
+      actionType: "WHATSAPP_SEND",
+      payload: { to: "+5561999999999", text: "Sem lead" },
+      preview: "Sem lead",
+    }, agent)).rejects.toMatchObject({ code: "CONTACT_ACTION_LEAD_REQUIRED" });
+
+    const lead = await createLead({
+      name: "Target binding " + randomUUID(),
+      status: "READY_TO_CONTACT",
+      whatsapp: "+5561888888888",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
+    await expect(createApprovalRequest({
+      leadId: lead.id,
+      actionType: "WHATSAPP_SEND",
+      payload: { to: "+5561777777777", text: "Destino errado" },
+      preview: "Destino errado",
+    }, agent)).rejects.toMatchObject({ code: "CONTACT_TARGET_NOT_LINKED" });
+  });
+
   it("blocks generic creation of proposal/contract approvals", async () => {
     await expect(createApprovalRequest({
       actionType: "PROPOSAL_SEND",
@@ -215,7 +236,14 @@ describe("commercial automation regressions", () => {
   });
 
   it("claims external execution before side effect and makes retries idempotent", async () => {
+    const lead = await createLead({
+      name: "WhatsApp idempotency " + randomUUID(),
+      status: "READY_TO_CONTACT",
+      whatsapp: "+5561999999999",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
     const pending = await createApprovalRequest({
+      leadId: lead.id,
       actionType: "WHATSAPP_SEND",
       payload: { to: "+5561999999999", text: "Teste idempotente" },
       preview: "Teste idempotente",
