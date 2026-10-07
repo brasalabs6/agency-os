@@ -397,6 +397,9 @@ export const contracts = pgTable("contracts", {
   id: uuid("id").primaryKey().defaultRandom(),
   leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
   proposalId: uuid("proposal_id").notNull().references(() => proposals.id, { onDelete: "restrict" }),
+  proposalVersion: integer("proposal_version").notNull(),
+  proposalSnapshotHash: text("proposal_snapshot_hash").notNull(),
+  proposalSnapshot: jsonb("proposal_snapshot").$type<Record<string, unknown>>().notNull().default({}),
   templateId: text("template_id").notNull(),
   templateVersion: text("template_version").notNull(),
   version: integer("version").notNull().default(1),
@@ -439,6 +442,7 @@ export const projectObligations = pgTable("project_obligations", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => clientProjects.id, { onDelete: "cascade" }),
   sourceContractId: uuid("source_contract_id").notNull().references(() => contracts.id, { onDelete: "restrict" }),
+  sourceKey: text("source_key").notNull(),
   party: text("party").notNull(),
   kind: text("kind").notNull(),
   title: text("title").notNull(),
@@ -448,4 +452,9 @@ export const projectObligations = pgTable("project_obligations", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("project_obligations_project_idx").on(t.projectId), index("project_obligations_status_idx").on(t.status), index("project_obligations_due_idx").on(t.dueAt)]);
+}, (t) => [
+  index("project_obligations_project_idx").on(t.projectId),
+  uniqueIndex("project_obligations_project_source_uidx").on(t.projectId, t.sourceKey),
+  index("project_obligations_status_idx").on(t.status),
+  index("project_obligations_due_idx").on(t.dueAt),
+]);
