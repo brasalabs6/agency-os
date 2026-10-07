@@ -1,19 +1,17 @@
 "use client";
 
 import { Languages } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { LOCALE_COOKIE, type Locale } from "@/lib/i18n/messages";
 import { useI18n } from "./i18n-provider";
 
 export function LanguageToggle({ compact = false }: { compact?: boolean }) {
-  const router = useRouter();
   const { locale, t } = useI18n();
 
   function change(next: Locale) {
     if (next === locale) return;
     document.cookie = `${LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
     document.documentElement.lang = next;
-    router.refresh();
+    window.location.reload();
   }
 
   return <label className={`focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--bg)] flex min-h-11 items-center rounded-lg border border-default bg-[var(--panel)] text-muted ${compact ? "px-1.5" : "gap-2 px-2.5"}`}>
