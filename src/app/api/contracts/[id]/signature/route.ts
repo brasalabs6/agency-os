@@ -1,0 +1,2 @@
+import { apiActor,errorResponse,ok } from "@/lib/services/http";import { contractSignatureSchema } from "@/lib/validation/automation";import { updateContractSignature } from "@/lib/services/sales-automation";
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const actor=await apiActor();const{id}=await params;return ok(await updateContractSignature(id,contractSignatureSchema.parse(await request.json()),actor));}catch(error){return errorResponse(error);}}
