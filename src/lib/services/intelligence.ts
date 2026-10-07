@@ -181,6 +181,14 @@ export async function updateDiagnostic(
   tool?: string,
 ) {
   const before = await getDiagnostic(id);
+  if (before.status !== "DRAFT") {
+    throw new DomainError(
+      "Only DRAFT diagnostics can be edited",
+      "DIAGNOSTIC_NOT_EDITABLE",
+      409,
+      { status: before.status },
+    );
+  }
   if (expectedVersion == null) {
     throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
@@ -233,6 +241,14 @@ export async function finalizeDiagnostic(
   tool?: string,
 ) {
   const before = await getDiagnostic(id);
+  if (before.status !== "DRAFT") {
+    throw new DomainError(
+      "Only DRAFT diagnostics can be finalized",
+      "DIAGNOSTIC_NOT_FINALIZABLE",
+      409,
+      { status: before.status },
+    );
+  }
   if (expectedVersion == null) {
     throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
@@ -261,6 +277,14 @@ export async function approveDiagnostic(
 ) {
   requireHumanActor(actor);
   const before = await getDiagnostic(id);
+  if (before.status !== "READY") {
+    throw new DomainError(
+      "Only READY diagnostics can be approved",
+      "DIAGNOSTIC_NOT_APPROVABLE",
+      409,
+      { status: before.status },
+    );
+  }
   if (expectedVersion == null) {
     throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
