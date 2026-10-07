@@ -51,7 +51,7 @@ export const diagnosticCreateSchema = z.object({
 export const diagnosticUpdateSchema = diagnosticCreateSchema
   .omit({ leadId: true, businessProfileId: true })
   .partial()
-  .extend({ expectedVersion: z.number().int().positive().optional() });
+  .extend({ expectedVersion: z.number().int().positive() });
 
 export const scoreAssessmentSchema = z.object({
   leadId: z.string().uuid(),
@@ -132,12 +132,13 @@ export const approvalCreateSchema = z.object({
 });
 
 export const approvalDecisionSchema = z.object({
-  expectedVersion: z.number().int().positive().optional(),
+  expectedVersion: z.number().int().positive(),
   payload: z.record(z.string(), z.unknown()).optional(),
   preview: z.string().max(100000).optional(),
 });
 
 export const qualificationSchema = z.object({
+  expectedVersion: z.number().int().positive().optional(),
   decisionMakers: z.array(z.string().max(500)).default([]),
   problemStatements: z.array(z.string().max(5000)).default([]),
   desiredOutcome: z.string().max(10000).nullable().optional(),
@@ -172,10 +173,11 @@ export const proposalCreateSchema = z.object({
 export const proposalUpdateSchema = proposalCreateSchema
   .omit({ leadId: true })
   .partial()
-  .extend({ expectedVersion: z.number().int().positive().optional() });
+  .extend({ expectedVersion: z.number().int().positive() });
 
 export const contractCreateSchema = z.object({
   proposalId: z.string().uuid(),
+  proposalVersion: z.number().int().positive(),
   templateId: z.string().min(1).max(300),
   templateVersion: z.string().min(1).max(100),
   parties: z.record(z.string(), z.unknown()).default({}),
@@ -188,9 +190,9 @@ export const contractCreateSchema = z.object({
 });
 
 export const contractUpdateSchema = contractCreateSchema
-  .omit({ proposalId: true, templateId: true, templateVersion: true })
+  .omit({ proposalId: true, proposalVersion: true, templateId: true, templateVersion: true })
   .partial()
-  .extend({ expectedVersion: z.number().int().positive().optional() });
+  .extend({ expectedVersion: z.number().int().positive() });
 
 export const contractSignatureSchema = z.object({
   status: z.enum(["SIGNED", "DECLINED"]),
@@ -214,3 +216,22 @@ export const obligationUpdateSchema = z.object({
 });
 
 export const diagnosticStatusSchema = z.enum(DIAGNOSTIC_STATUSES);
+
+
+export const versionCommandSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+});
+
+export const deliveryTargetSchema = z.object({
+  channel: z.enum(["EMAIL", "WHATSAPP", "OTHER"]),
+  to: z.string().min(1).max(1000),
+});
+
+export const approvalRequestCommandSchema = versionCommandSchema.extend({
+  delivery: deliveryTargetSchema,
+});
+
+export const proposalResponseSchema = versionCommandSchema.extend({
+  status: z.enum(["ACCEPTED", "REJECTED"]),
+  notes: z.string().max(5000).optional(),
+});
