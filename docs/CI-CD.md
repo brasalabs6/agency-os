@@ -67,7 +67,7 @@ It runs:
 - `npm run build`
 - a local smoke test against the built Next.js artifact
 
-On pull requests, a separate **Mobile Browser Gate** runs on a GitHub-hosted public `ubuntu-latest` runner after the Quality Gate. It installs a pinned Playwright runner ephemerally (without changing the application lockfile), installs Chromium, starts AgencyOS with the mock data driver, signs in with the demo admin account, and validates the core routes at 360×800, 390×844, 412×915 and 768×1024. It checks that the intended mobile variants are rendered, that the document does not gain horizontal overflow, and that the PT-BR/English language preference persists.
+On pull requests, a separate **Mobile Browser Gate** runs on a GitHub-hosted public `ubuntu-latest` runner after the Quality Gate. It installs a pinned Playwright runner ephemerally (without changing the application lockfile), installs Chromium, starts AgencyOS with the mock data driver and development auth bypass, and validates the core routes at 360×800, 390×844, 412×915 and 768×1024. Authentication behavior remains covered separately by unit/service tests and the regular quality gate; the browser job isolates responsive and localization regressions from in-memory mock-session boundaries. It checks that the intended mobile variants are rendered, that the document does not gain horizontal overflow, and that the PT-BR/English language preference persists.
 
 After both gates pass, CI waits for Vercel's **Vercel** commit status, producing the **Vercel Preview** check.
 
