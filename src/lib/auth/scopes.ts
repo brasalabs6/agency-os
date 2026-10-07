@@ -1,3 +1,5 @@
+import type { UserRole } from "@/lib/domain/types";
+
 export const AGENT_SCOPES = [
   "leads.read",
   "leads.write",
@@ -24,4 +26,10 @@ export const AGENT_SCOPES = [
 
 export type AgentScope = (typeof AGENT_SCOPES)[number];
 
-export const HUMAN_APP_SCOPES = [...AGENT_SCOPES, "approvals.approve"] as const;
+export const HUMAN_MEMBER_SCOPES = [...AGENT_SCOPES] as const;
+export const HUMAN_ADMIN_SCOPES = [...AGENT_SCOPES, "approvals.approve"] as const;
+export const HUMAN_APP_SCOPES = HUMAN_ADMIN_SCOPES;
+
+export function humanScopesForRole(role: UserRole): string[] {
+  return role === "ADMIN" ? [...HUMAN_ADMIN_SCOPES] : [...HUMAN_MEMBER_SCOPES];
+}
