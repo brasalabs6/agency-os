@@ -93,7 +93,7 @@ export async function upsertQualification(
   input: Omit<Qualification,
     "id" | "leadId" | "version" | "createdAt" | "updatedAt" |
     "createdByType" | "createdById">,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -255,7 +255,7 @@ type ProposalEditableChanges = Partial<Pick<Proposal,
 export async function updateProposal(
   id: string,
   changes: ProposalEditableChanges,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -267,9 +267,6 @@ export async function updateProposal(
       409,
       { status: before.status },
     );
-  }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
   if (changes.agencyFeeCents != null && changes.agencyFeeCents < 0) {
     throw new DomainError("Agency fee cannot be negative", "INVALID_PRICE", 422);
@@ -310,16 +307,16 @@ async function cancelUnboundApproval(approvalId: string) {
 
 export async function requestProposalApproval(
   id: string,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
-  delivery?: DeliveryTarget,
+  delivery: DeliveryTarget,
 ) {
   const proposal = await getProposal(id);
   if (proposal.status !== "DRAFT") {
     throw new DomainError("Only DRAFT proposals can enter approval", "PROPOSAL_NOT_APPROVABLE", 409);
   }
-  if (expectedVersion == null || expectedVersion !== proposal.version) {
+  if (expectedVersion !== proposal.version) {
     throwVersionConflict("Proposal");
   }
   if (proposal.agencyFeeCents == null || !proposal.paymentTerms) {
@@ -338,7 +335,7 @@ export async function requestProposalApproval(
       proposalId: id,
       version: boundVersion,
       renderedContent: proposal.renderedContent,
-      delivery: delivery ?? null,
+      delivery,
     },
     preview: proposal.renderedContent ?? "Proposta",
     rationale: "Enviar proposta comercial versionada.",
@@ -401,7 +398,8 @@ export async function executeApprovedProposal(
     });
 
     const lead = await getLead(proposal.leadId);
-    if (lead.lead.status !== "PROPOSAL_SENT") {
+    const projectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    if (!projectionSkipped && lead.lead.status !== "PROPOSAL_SENT") {
       await moveLeadStage(proposal.leadId, "PROPOSAL_SENT", actor, {
         reason: "Approved proposal sent",
         tool,
@@ -413,7 +411,7 @@ export async function executeApprovedProposal(
       "proposal",
       proposal.id,
       { approvalId, idempotencyKey: claim.approval.id },
-      { status: "SENT", delivery: deliveryResult },
+      { status: "SENT", delivery: deliveryResult, leadProjectionSkipped: projectionSkipped },
       proposal.leadId,
       tool,
     );
@@ -437,7 +435,7 @@ export async function markProposalResponse(
   id: string,
   status: "ACCEPTED" | "REJECTED",
   notes: string | undefined,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -451,17 +449,16 @@ export async function markProposalResponse(
       { status: proposal.status },
     );
   }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
-  }
   const updated = await repo().updateProposal(id, expectedVersion, {
     status,
     responseNotes: notes ?? null,
   });
   if (!updated) throwVersionConflict("Proposal");
+  let leadProjectionSkipped = false;
   if (status === "ACCEPTED") {
     const lead = await getLead(proposal.leadId);
-    if (lead.lead.status !== "NEGOTIATION") {
+    leadProjectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    if (!leadProjectionSkipped && lead.lead.status !== "NEGOTIATION") {
       await moveLeadStage(proposal.leadId, "NEGOTIATION", actor, {
         reason: "Proposal accepted; contract preparation started",
         tool,
@@ -474,7 +471,7 @@ export async function markProposalResponse(
     "proposal",
     id,
     { status, notes, expectedVersion },
-    { version: updated.version },
+    { version: updated.version, leadProjectionSkipped },
     proposal.leadId,
     tool,
   );
@@ -629,7 +626,7 @@ type ContractEditableChanges = Partial<Pick<Contract,
 export async function updateContractDraft(
   id: string,
   changes: ContractEditableChanges,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
 ) {
@@ -641,9 +638,6 @@ export async function updateContractDraft(
       409,
       { status: before.status },
     );
-  }
-  if (expectedVersion == null) {
-    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
   }
   const next = { ...before, ...changes };
   const updated = await repo().updateContract(id, expectedVersion, {
@@ -666,7 +660,7 @@ export async function updateContractDraft(
 
 export async function requestContractApproval(
   id: string,
-  expectedVersion: number | undefined,
+  expectedVersion: number,
   actor: ActorContext,
   tool?: string,
   delivery?: DeliveryTarget,
@@ -680,7 +674,7 @@ export async function requestContractApproval(
       { status: contract.status },
     );
   }
-  if (expectedVersion == null || expectedVersion !== contract.version) {
+  if (expectedVersion !== contract.version) {
     throwVersionConflict("Contract");
   }
 
@@ -692,7 +686,7 @@ export async function requestContractApproval(
       contractId: id,
       version: boundVersion,
       renderedContent: contract.renderedContent,
-      delivery: delivery ?? null,
+      delivery,
     },
     preview: contract.renderedContent ?? "Contrato",
     rationale: "Revisão humana/jurídica obrigatória antes do envio.",
@@ -844,9 +838,11 @@ export async function updateContractSignature(
   });
   if (!updated) throwVersionConflict("Contract");
 
+  let leadProjectionSkipped = false;
   if (input.status === "SIGNED") {
     const lead = await getLead(contract.leadId);
-    if (lead.lead.status !== "WON" && lead.lead.status !== "ONBOARDING") {
+    leadProjectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    if (!leadProjectionSkipped && lead.lead.status !== "WON" && lead.lead.status !== "ONBOARDING") {
       await moveLeadStage(contract.leadId, "WON", actor, {
         reason: "Contract signed",
         tool,
@@ -862,7 +858,7 @@ export async function updateContractSignature(
       status: input.status,
       externalSignatureId: input.externalSignatureId ?? contract.externalSignatureId ?? null,
     },
-    { version: updated.version },
+    { version: updated.version, leadProjectionSkipped },
     contract.leadId,
     tool,
   );
