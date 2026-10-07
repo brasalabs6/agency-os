@@ -221,6 +221,9 @@ export async function approveRequest(
     throw new DomainError("Approval is not pending", "APPROVAL_NOT_PENDING", 409);
   }
   ensureApprovalNotExpired(before);
+  if (before.policyChecks.some((check) => !check.passed)) {
+    throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
+  }
   const payload = input.payload ?? before.payload;
   const updated = await repo().updateApproval(id, input.expectedVersion, {
     payload,
@@ -345,6 +348,12 @@ export async function executeApprovedWhatsapp(
   }
   if (approval.policyChecks.some((check) => !check.passed)) {
     throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
+  }
+  if (approval.leadId) {
+    const current = await getLead(approval.leadId);
+    if (current.lead.doNotContact || current.lead.status === "DO_NOT_CONTACT") {
+      throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
+    }
   }
   const result = await sendWhatsappPayload(approval.payload);
   const updated = await repo().updateApproval(id, approval.version, {
