@@ -13,19 +13,16 @@ async function login(page) {
   await page.locator('input[name="password"]').fill("admin-agencyos-2026");
   await Promise.all([
     page.waitForURL("**/"),
-    page.locator('button[type="submit"]').click(),
+    page.locator('form[action="/api/auth/login"] button').click(),
   ]);
 }
 
 async function expectNoDocumentOverflow(page) {
-  await expect.poll(() => page.evaluate(() => ({
+  const sizes = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
-  }))).toEqual(expect.objectContaining({
-    client: await page.evaluate(() => document.documentElement.clientWidth),
   }));
-  const overflowing = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
-  expect(overflowing).toBeFalsy();
+  expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
 }
 
 test("core CRM routes stay mobile-first across target viewports", async ({ page }) => {
