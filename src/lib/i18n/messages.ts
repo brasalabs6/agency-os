@@ -356,6 +356,14 @@ const ptBR = {
   "mcp.empty": "Nenhuma conexão criada ainda.",
   "mcp.revokeConfirm": "Revogar \"{name}\"? O ChatGPT que usa essa URL perderá acesso imediatamente.",
 
+  "service.WEBSITE": "Website",
+  "service.LANDING_PAGE": "Landing page",
+  "service.DIGITAL_CATALOG": "Catálogo digital",
+  "service.GOOGLE_BUSINESS": "Google Business",
+  "service.AUTOMATION": "Automação",
+  "service.CUSTOM_SYSTEM": "Sistema sob medida",
+  "service.OTHER": "Outro",
+
   "status.DISCOVERED": "Descoberto",
   "status.ENRICHED": "Enriquecido",
   "status.SCORED": "Pontuado",
@@ -759,6 +767,14 @@ const en: Record<MessageKey, string> = {
   "mcp.rotate": "Create a new connection to rotate",
   "mcp.empty": "No connections created yet.",
   "mcp.revokeConfirm": "Revoke \"{name}\"? The ChatGPT using this URL will immediately lose access.",
+
+  "service.WEBSITE": "Website",
+  "service.LANDING_PAGE": "Landing page",
+  "service.DIGITAL_CATALOG": "Digital catalog",
+  "service.GOOGLE_BUSINESS": "Google Business",
+  "service.AUTOMATION": "Automation",
+  "service.CUSTOM_SYSTEM": "Custom system",
+  "service.OTHER": "Other",
 
   "status.DISCOVERED": "Discovered",
   "status.ENRICHED": "Enriched",
