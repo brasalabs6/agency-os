@@ -17,5 +17,5 @@ export default defineConfig([
       ],
     },
   },
-  globalIgnores([".next/**", "dist/**", "coverage/**"]),
+  globalIgnores([".next/**", "dist/**", "coverage/**", "tests/e2e/**", "playwright.config.mjs"]),
 ]);
