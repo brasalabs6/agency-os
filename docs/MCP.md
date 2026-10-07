@@ -181,3 +181,17 @@ Important new tools include:
 - contract-derived project/obligation tools
 
 No `whatsapp_send_raw`, `approval_approve` or `approval_reject` MCP tools exist.
+
+
+### Commercial automation invariants
+
+- Agents may request/read approvals but never receive `approvals.approve`.
+- Web approval decisions are role-gated: ADMIN can approve/reject; MEMBER cannot.
+- `approval_request_create` cannot create `PROPOSAL_SEND` or `CONTRACT_SEND`; use the specialized proposal/contract tools.
+- Sensitive writes use the `expectedVersion` returned by the preceding read.
+- `proposal_request_approval` and `contract_request_approval` require that expected version and bind the post-transition version into the approval payload.
+- `contract_create_from_proposal` requires the exact accepted `proposalVersion`.
+- WhatsApp approvals require a `leadId` and a recipient already registered/linked to that lead.
+- External execution uses an atomic `APPROVED → EXECUTING` claim before side effects.
+- Provider adapters receive `Idempotency-Key: <approvalId>` and MUST deduplicate requests with the same key.
+- A still-valid execution lease blocks concurrent retries. After a stale lease, the same action may resume only with the same idempotency key.
