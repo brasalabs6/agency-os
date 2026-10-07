@@ -1,7 +1,7 @@
 import { DomainError } from "@/lib/domain/errors";
 import type { ActorContext, ServiceOpportunity } from "@/lib/domain/types";
 import type {
-  AiRun, AutomationBundle, BusinessProfile, Diagnostic, DiagnosticFinding,
+  AutomationBundle, BusinessProfile, Diagnostic, DiagnosticFinding,
   DiagnosticRecommendation, ScoreAssessment,
 } from "@/lib/domain/automation";
 import { getAutomationRepository } from "@/lib/repositories";
