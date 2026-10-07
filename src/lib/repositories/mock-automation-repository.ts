@@ -96,6 +96,7 @@ export class MockAutomationRepository implements AutomationRepository {
     return clone(this.conversations.filter((x)=>(!filters.leadId||x.leadId===filters.leadId)&&(!filters.connectionId||x.connectionId===filters.connectionId)).sort((a,b)=>(b.lastMessageAt??b.updatedAt).localeCompare(a.lastMessageAt??a.updatedAt)).slice(0,filters.limit??100));
   }
   async getConversation(id:string){return clone(this.conversations.find((x)=>x.id===id)??null);}
+  async getConversationByExternal(connectionId:string,externalId:string){return clone(this.conversations.find((x)=>x.connectionId===connectionId&&x.externalId===externalId)??null);}
   async upsertConversation(input:Omit<Conversation,"id"|"createdAt"|"updatedAt">){
     const i=this.conversations.findIndex((x)=>x.connectionId===input.connectionId&&x.externalId===input.externalId); const ts=now();
     if(i>=0){const cur=this.conversations[i];const updated={...cur,...input,id:cur.id,updatedAt:ts};this.conversations[i]=updated;return clone(updated);}
@@ -125,9 +126,10 @@ export class MockAutomationRepository implements AutomationRepository {
   }
 
   async getQualification(leadId:string){return clone(this.qualifications.find((x)=>x.leadId===leadId)??null);}
-  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string}){
+  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string},expectedVersion?:number){
     const i=this.qualifications.findIndex((x)=>x.leadId===input.leadId);const ts=now();
-    if(i>=0){const cur=this.qualifications[i];const updated={...cur,...input,id:cur.id,version:cur.version+1,updatedAt:ts};this.qualifications[i]=updated;return clone(updated);}
+    if(i>=0){const cur=this.qualifications[i];if(expectedVersion==null||cur.version!==expectedVersion)return null;const updated={...cur,...input,id:cur.id,version:cur.version+1,updatedAt:ts};this.qualifications[i]=updated;return clone(updated);}
+    if(expectedVersion!=null)return null;
     const {id:_id,...rest}=input;const item:Qualification={id:randomUUID(),...rest,createdAt:ts,updatedAt:ts};this.qualifications.push(item);return clone(item);
   }
 
@@ -149,11 +151,17 @@ export class MockAutomationRepository implements AutomationRepository {
 
   async listProjects(leadId:string){return clone(this.projects.filter((x)=>x.leadId===leadId));}
   async getProjectByContract(contractId:string){return clone(this.projects.find((x)=>x.contractId===contractId)??null);}
-  async createProject(input:Omit<ClientProject,"id"|"createdAt"|"updatedAt">){const ts=now();const item:ClientProject={id:randomUUID(),...input,createdAt:ts,updatedAt:ts};this.projects.push(item);return clone(item);}
+  async createProject(input:Omit<ClientProject,"id"|"createdAt"|"updatedAt">){
+    const existing=this.projects.find((x)=>x.contractId===input.contractId);if(existing)return clone(existing);
+    const ts=now();const item:ClientProject={id:randomUUID(),...input,createdAt:ts,updatedAt:ts};this.projects.push(item);return clone(item);
+  }
   async updateProject(id:string,changes:Partial<ClientProject>){const i=this.projects.findIndex((x)=>x.id===id);if(i<0)return null;const cur=this.projects[i];const updated={...cur,...changes,id:cur.id,updatedAt:now()};this.projects[i]=updated;return clone(updated);}
 
   async listObligations(projectId:string){return clone(this.obligations.filter((x)=>x.projectId===projectId));}
-  async createObligation(input:Omit<ProjectObligation,"id"|"createdAt"|"updatedAt">){const ts=now();const item:ProjectObligation={id:randomUUID(),...input,createdAt:ts,updatedAt:ts};this.obligations.push(item);return clone(item);}
+  async createObligation(input:Omit<ProjectObligation,"id"|"createdAt"|"updatedAt">){
+    const existing=this.obligations.find((x)=>x.projectId===input.projectId&&x.sourceKey===input.sourceKey);if(existing)return clone(existing);
+    const ts=now();const item:ProjectObligation={id:randomUUID(),...input,createdAt:ts,updatedAt:ts};this.obligations.push(item);return clone(item);
+  }
   async updateObligation(id:string,changes:Partial<ProjectObligation>){const i=this.obligations.findIndex((x)=>x.id===id);if(i<0)return null;const cur=this.obligations[i];const updated={...cur,...changes,id:cur.id,updatedAt:now()};this.obligations[i]=updated;return clone(updated);}
 }
 

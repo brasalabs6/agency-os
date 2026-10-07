@@ -92,7 +92,7 @@ export function registerIntelligenceTools(server: McpServer, actor: ActorContext
 
   server.registerTool("lead_diagnostic_update", {
     title: "Update diagnostic",
-    description: "Update a diagnostic draft. Use expectedVersion when editing a previously read version.",
+    description: "Update a diagnostic draft using the required expectedVersion from the version previously read.",
     annotations: mcpWriteAnnotations,
     inputSchema: diagnosticUpdateSchema.extend({ diagnosticId: z.string().uuid() }),
   }, async ({ diagnosticId, expectedVersion, ...changes }) => {
@@ -104,7 +104,7 @@ export function registerIntelligenceTools(server: McpServer, actor: ActorContext
     title: "Finalize diagnostic",
     description: "Render a diagnostic into a READY internal/public artifact. Human approval remains separate.",
     annotations: mcpWriteAnnotations,
-    inputSchema: z.object({ diagnosticId: z.string().uuid(), expectedVersion: z.number().int().positive().optional() }),
+    inputSchema: z.object({ diagnosticId: z.string().uuid(), expectedVersion: z.number().int().positive() }),
   }, async ({ diagnosticId, expectedVersion }) => {
     requireScope(actor, "diagnostics.write");
     return mcpTextResult(await finalizeDiagnostic(diagnosticId, expectedVersion, actor, "lead_diagnostic_finalize"));

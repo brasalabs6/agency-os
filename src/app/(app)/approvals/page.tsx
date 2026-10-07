@@ -7,9 +7,12 @@ import { getI18n } from "@/lib/i18n/server";
 import { listApprovals } from "@/lib/services/communications";
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; status?: string }> }) {
-  await requireCurrentUser();
   const params = await searchParams;
-  const [items, i18n] = await Promise.all([listApprovals({ leadId: params.leadId, status: params.status, limit: 200 }), getI18n()]);
+  const [user, items, i18n] = await Promise.all([
+    requireCurrentUser(),
+    listApprovals({ leadId: params.leadId, status: params.status, limit: 200 }),
+    getI18n(),
+  ]);
   const { t } = i18n;
   const query = params.leadId ? `&leadId=${encodeURIComponent(params.leadId)}` : "";
   const allHref = params.leadId ? `/approvals?leadId=${encodeURIComponent(params.leadId)}` : "/approvals";
@@ -21,6 +24,6 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
       <Link href={`/approvals?status=PENDING${query}`} className={buttonSecondaryClass}>{t("approvals.pending")}</Link>
       <Link href={`/approvals?status=APPROVED${query}`} className={buttonSecondaryClass}>{t("approvals.approved")}</Link>
     </div>
-    <ApprovalInbox items={items}/>
+    <ApprovalInbox items={items} canApprove={user.role === "ADMIN"}/>
   </>;
 }

@@ -127,6 +127,17 @@ export async function createDiagnostic(
   tool?: string,
 ) {
   await getLead(leadId);
+  if (input.businessProfileId) {
+    const profiles = await repo().listBusinessProfiles(leadId);
+    if (!profiles.some((profile) => profile.id === input.businessProfileId)) {
+      throw new DomainError(
+        "Business profile belongs to another lead",
+        "RELATION_LEAD_MISMATCH",
+        422,
+        { relation: "businessProfileId" },
+      );
+    }
+  }
   const item = await repo().createDiagnostic({
     leadId,
     businessProfileId: input.businessProfileId ?? null,
@@ -170,6 +181,9 @@ export async function updateDiagnostic(
   tool?: string,
 ) {
   const before = await getDiagnostic(id);
+  if (expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
   const updated = await repo().updateDiagnostic(id, expectedVersion, changes);
   if (!updated) throwVersionConflict("Diagnostic");
   await automationAudit(
@@ -219,6 +233,9 @@ export async function finalizeDiagnostic(
   tool?: string,
 ) {
   const before = await getDiagnostic(id);
+  if (expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
   const updated = await repo().updateDiagnostic(id, expectedVersion, {
     status: "READY",
     renderedContent: renderDiagnosticMarkdown(before),
@@ -244,6 +261,9 @@ export async function approveDiagnostic(
 ) {
   requireHumanActor(actor);
   const before = await getDiagnostic(id);
+  if (expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
   const updated = await repo().updateDiagnostic(id, expectedVersion, { status: "APPROVED" });
   if (!updated) throwVersionConflict("Diagnostic");
   await automationAudit(actor, "diagnostic.approve", "diagnostic", id, {}, { status: "APPROVED" }, before.leadId);
@@ -268,6 +288,17 @@ export async function createScoreAssessment(
   tool?: string,
 ) {
   const data = await getLead(leadId);
+  if (input.diagnosticId) {
+    const diagnostic = await getDiagnostic(input.diagnosticId);
+    if (diagnostic.leadId !== leadId) {
+      throw new DomainError(
+        "Diagnostic belongs to another lead",
+        "RELATION_LEAD_MISMATCH",
+        422,
+        { relation: "diagnosticId" },
+      );
+    }
+  }
   validateScore(input);
   const total =
     input.digitalGap + input.economicPotential + input.contactability +

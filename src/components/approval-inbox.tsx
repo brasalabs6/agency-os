@@ -7,7 +7,7 @@ import { automationActionMessageKey, automationStatusMessageKey } from "@/lib/i1
 import { useI18n } from "./i18n-provider";
 import { buttonPrimaryClass, buttonSecondaryClass, textareaClass } from "./ui-kit";
 
-function ApprovalCard({ item }: { item: ApprovalRequest }) {
+function ApprovalCard({ item, canApprove }: { item: ApprovalRequest; canApprove: boolean }) {
   const router = useRouter();
   const { t } = useI18n();
   const [preview, setPreview] = useState(item.preview);
@@ -18,6 +18,10 @@ function ApprovalCard({ item }: { item: ApprovalRequest }) {
     try { return JSON.parse(payload) as Record<string, unknown>; }
     catch { return null; }
   }, [payload]);
+  const specialized = item.actionType === "PROPOSAL_SEND" || item.actionType === "CONTRACT_SEND";
+  const pending = item.status === "PENDING";
+  const payloadEditable = canApprove && pending;
+  const previewEditable = canApprove && pending && !specialized;
 
   async function act(kind: "approve" | "reject") {
     setBusy(true);
@@ -55,7 +59,6 @@ function ApprovalCard({ item }: { item: ApprovalRequest }) {
     }
   }
 
-  const editable = item.status === "PENDING";
   const changed = preview !== item.preview || payload !== JSON.stringify(item.payload, null, 2);
 
   return <article className="surface-flat min-w-0 rounded-xl p-4 sm:p-5">
@@ -64,18 +67,21 @@ function ApprovalCard({ item }: { item: ApprovalRequest }) {
       <span className="shrink-0 rounded-full border border-default px-2 py-1 text-[10px]">{t(automationStatusMessageKey(item.status))} · v{item.version}</span>
     </div>
     {item.rationale ? <p className="mt-3 break-words text-xs leading-5 text-muted">{item.rationale}</p> : null}
+    {specialized && pending ? <p className="mt-3 rounded-lg border border-default bg-[var(--panel-2)] p-3 text-xs leading-5 text-muted">{t("approvals.versionedDocument")}</p> : null}
     <label className="mt-4 block text-[10px] font-semibold uppercase tracking-wide text-muted">{t("approvals.approvedPreview")}
-      <textarea value={preview} onChange={(event) => setPreview(event.target.value)} disabled={!editable} rows={5} className={`mt-1.5 ${textareaClass} text-xs disabled:opacity-70`}/>
+      <textarea value={preview} onChange={(event) => setPreview(event.target.value)} disabled={!previewEditable} rows={5} className={`mt-1.5 ${textareaClass} text-xs disabled:opacity-70`}/>
     </label>
     <details className="mt-3">
       <summary className="min-h-11 cursor-pointer content-center text-xs text-muted">{t("approvals.structuredPayload")}</summary>
-      <textarea value={payload} onChange={(event) => setPayload(event.target.value)} disabled={!editable} rows={9} className={`mt-2 ${textareaClass} font-mono text-[11px] disabled:opacity-70`}/>
-      {editable && !parsed ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t("approvals.invalidPayload")}</p> : null}
+      <textarea value={payload} onChange={(event) => setPayload(event.target.value)} disabled={!payloadEditable} rows={9} className={`mt-2 ${textareaClass} font-mono text-[11px] disabled:opacity-70`}/>
+      {payloadEditable && !parsed ? <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{t("approvals.invalidPayload")}</p> : null}
     </details>
     <div className="mt-4 space-y-1">{item.policyChecks.map((check) => <div key={check.id} className={`break-words text-xs ${check.passed ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>{check.passed ? "✓" : "✕"} {check.message}</div>)}</div>
+    {!canApprove && pending ? <p className="mt-3 rounded-lg bg-[var(--panel-2)] p-3 text-xs leading-5 text-muted">{t("approvals.readOnlyRole")}</p> : null}
+    {item.status === "EXECUTING" ? <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">{t("approvals.executingWarning")}</p> : null}
     {error ? <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">{error}</p> : null}
     <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-      {item.status === "PENDING" ? <>
+      {pending && canApprove ? <>
         <button disabled={busy || !parsed} onClick={() => void act("approve")} className={buttonPrimaryClass}>{changed ? t("approvals.approveChanges") : t("approvals.approve")}</button>
         <button disabled={busy} onClick={() => void act("reject")} className={buttonSecondaryClass}>{t("approvals.reject")}</button>
       </> : null}
@@ -84,8 +90,8 @@ function ApprovalCard({ item }: { item: ApprovalRequest }) {
   </article>;
 }
 
-export function ApprovalInbox({ items }: { items: ApprovalRequest[] }) {
+export function ApprovalInbox({ items, canApprove }: { items: ApprovalRequest[]; canApprove: boolean }) {
   const { t } = useI18n();
   if (!items.length) return <div className="surface-flat rounded-xl p-8 text-center text-sm text-muted">{t("approvals.none")}</div>;
-  return <div className="grid min-w-0 gap-4 xl:grid-cols-2">{items.map((item) => <ApprovalCard key={item.id} item={item}/>)}</div>;
+  return <div className="grid min-w-0 gap-4 xl:grid-cols-2">{items.map((item) => <ApprovalCard key={item.id} item={item} canApprove={canApprove}/>)}</div>;
 }

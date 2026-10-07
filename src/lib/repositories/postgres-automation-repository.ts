@@ -51,13 +51,13 @@ function mapProposal(r: typeof proposals.$inferSelect): Proposal {
   return { id:r.id,leadId:r.leadId,diagnosticId:r.diagnosticId,qualificationId:r.qualificationId,version:r.version,status:r.status,services:arr(r.services),scope:arr(r.scope),exclusions:arr(r.exclusions),assumptions:arr(r.assumptions),clientDependencies:arr(r.clientDependencies),milestones:arr(r.milestones),agencyFeeCents:r.agencyFeeCents,currency:r.currency,externalCosts:arr(r.externalCosts),paymentTerms:r.paymentTerms,validityUntil:iso(r.validityUntil),renderedContent:r.renderedContent,artifactRef:r.artifactRef,approvalId:r.approvalId,sentAt:iso(r.sentAt),responseNotes:r.responseNotes,createdByType:r.createdByType,createdById:r.createdById,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 function mapContract(r: typeof contracts.$inferSelect): Contract {
-  return { id:r.id,leadId:r.leadId,proposalId:r.proposalId,templateId:r.templateId,templateVersion:r.templateVersion,version:r.version,status:r.status,parties:obj(r.parties),terms:obj(r.terms),responsibilitiesAgency:arr(r.responsibilitiesAgency),responsibilitiesClient:arr(r.responsibilitiesClient),paymentObligations:arr(r.paymentObligations),deliverables:arr(r.deliverables),supportObligations:arr(r.supportObligations),renderedContent:r.renderedContent,artifactRef:r.artifactRef,approvalId:r.approvalId,signatureProvider:r.signatureProvider,externalSignatureId:r.externalSignatureId,signedArtifactRef:r.signedArtifactRef,signedAt:iso(r.signedAt),createdByType:r.createdByType,createdById:r.createdById,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
+  return { id:r.id,leadId:r.leadId,proposalId:r.proposalId,proposalVersion:r.proposalVersion,proposalSnapshotHash:r.proposalSnapshotHash,proposalSnapshot:obj(r.proposalSnapshot),templateId:r.templateId,templateVersion:r.templateVersion,version:r.version,status:r.status,parties:obj(r.parties),terms:obj(r.terms),responsibilitiesAgency:arr(r.responsibilitiesAgency),responsibilitiesClient:arr(r.responsibilitiesClient),paymentObligations:arr(r.paymentObligations),deliverables:arr(r.deliverables),supportObligations:arr(r.supportObligations),renderedContent:r.renderedContent,artifactRef:r.artifactRef,approvalId:r.approvalId,signatureProvider:r.signatureProvider,externalSignatureId:r.externalSignatureId,signedArtifactRef:r.signedArtifactRef,signedAt:iso(r.signedAt),createdByType:r.createdByType,createdById:r.createdById,createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 function mapProject(r: typeof clientProjects.$inferSelect): ClientProject {
   return { id:r.id,leadId:r.leadId,contractId:r.contractId,name:r.name,status:r.status,ownerUserId:r.ownerUserId,startedAt:iso(r.startedAt),targetAt:iso(r.targetAt),completedAt:iso(r.completedAt),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 function mapObligation(r: typeof projectObligations.$inferSelect): ProjectObligation {
-  return { id:r.id,projectId:r.projectId,sourceContractId:r.sourceContractId,party:r.party as ProjectObligation["party"],kind:r.kind as ProjectObligation["kind"],title:r.title,description:r.description,status:r.status,dueAt:iso(r.dueAt),metadata:obj(r.metadata),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
+  return { id:r.id,projectId:r.projectId,sourceContractId:r.sourceContractId,sourceKey:r.sourceKey,party:r.party as ProjectObligation["party"],kind:r.kind as ProjectObligation["kind"],title:r.title,description:r.description,status:r.status,dueAt:iso(r.dueAt),metadata:obj(r.metadata),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 
 export class PostgresAutomationRepository implements AutomationRepository {
@@ -117,6 +117,7 @@ export class PostgresAutomationRepository implements AutomationRepository {
     return (await getDb().select().from(conversations).where(conditions.length?and(...conditions):undefined).orderBy(desc(conversations.lastMessageAt)).limit(filters.limit??100)).map(mapConversation);
   }
   async getConversation(id:string){const [r]=await getDb().select().from(conversations).where(eq(conversations.id,id)).limit(1);return r?mapConversation(r):null;}
+  async getConversationByExternal(connectionId:string,externalId:string){const [r]=await getDb().select().from(conversations).where(and(eq(conversations.connectionId,connectionId),eq(conversations.externalId,externalId))).limit(1);return r?mapConversation(r):null;}
   async upsertConversation(input:Omit<Conversation,"id"|"createdAt"|"updatedAt">){
     const [r]=await getDb().insert(conversations).values({connectionId:input.connectionId,externalId:input.externalId,leadId:input.leadId,contactAddress:input.contactAddress,contactDisplayName:input.contactDisplayName,lastMessageAt:input.lastMessageAt?new Date(input.lastMessageAt):null,optOutDetected:input.optOutDetected})
       .onConflictDoUpdate({target:[conversations.connectionId,conversations.externalId],set:{leadId:input.leadId,contactAddress:input.contactAddress,contactDisplayName:input.contactDisplayName,lastMessageAt:input.lastMessageAt?new Date(input.lastMessageAt):null,optOutDetected:input.optOutDetected,updatedAt:new Date()}}).returning();return mapConversation(r);
@@ -124,7 +125,10 @@ export class PostgresAutomationRepository implements AutomationRepository {
   async linkConversation(id:string,leadId:string|null,optOutDetected?:boolean){
     const [r]=await getDb().update(conversations).set({leadId,optOutDetected,updatedAt:new Date()}).where(eq(conversations.id,id)).returning();return r?mapConversation(r):null;
   }
-  async listMessages(conversationId:string,limit=200){return (await getDb().select().from(channelMessages).where(eq(channelMessages.conversationId,conversationId)).orderBy(channelMessages.sentAt).limit(limit)).map(mapMessage);}
+  async listMessages(conversationId:string,limit=200){
+    const rows=await getDb().select().from(channelMessages).where(eq(channelMessages.conversationId,conversationId)).orderBy(desc(channelMessages.sentAt),desc(channelMessages.createdAt)).limit(limit);
+    return rows.reverse().map(mapMessage);
+  }
   async upsertMessage(input:Omit<ChannelMessage,"id"|"createdAt">){
     const [r]=await getDb().insert(channelMessages).values({conversationId:input.conversationId,externalId:input.externalId,direction:input.direction,sentAt:new Date(input.sentAt),sender:input.sender,text:input.text,mediaType:input.mediaType,deliveryStatus:input.deliveryStatus,rawMetadata:input.rawMetadata})
       .onConflictDoUpdate({target:[channelMessages.conversationId,channelMessages.externalId],set:{direction:input.direction,sentAt:new Date(input.sentAt),sender:input.sender,text:input.text,mediaType:input.mediaType,deliveryStatus:input.deliveryStatus,rawMetadata:input.rawMetadata}}).returning();return mapMessage(r);
@@ -144,10 +148,50 @@ export class PostgresAutomationRepository implements AutomationRepository {
   }
 
   async getQualification(leadId:string){const [r]=await getDb().select().from(qualifications).where(eq(qualifications.leadId,leadId)).orderBy(desc(qualifications.updatedAt)).limit(1);return r?mapQualification(r):null;}
-  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string}){
+  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string},expectedVersion?:number){
     const existing=await this.getQualification(input.leadId);
-    if(existing){const [r]=await getDb().update(qualifications).set({version:existing.version+1,decisionMakers:input.decisionMakers,problemStatements:input.problemStatements,desiredOutcome:input.desiredOutcome,currentProcess:input.currentProcess,urgency:input.urgency,explicitBudgetStatement:input.explicitBudgetStatement,timeline:input.timeline,constraints:input.constraints,technicalDependencies:input.technicalDependencies,unansweredQuestions:input.unansweredQuestions,riskFlags:input.riskFlags,serviceFit:input.serviceFit,createdByType:input.createdByType,createdById:input.createdById,updatedAt:new Date()}).where(eq(qualifications.id,existing.id)).returning();return mapQualification(r);}
-    const [r]=await getDb().insert(qualifications).values({leadId:input.leadId,version:input.version,decisionMakers:input.decisionMakers,problemStatements:input.problemStatements,desiredOutcome:input.desiredOutcome,currentProcess:input.currentProcess,urgency:input.urgency,explicitBudgetStatement:input.explicitBudgetStatement,timeline:input.timeline,constraints:input.constraints,technicalDependencies:input.technicalDependencies,unansweredQuestions:input.unansweredQuestions,riskFlags:input.riskFlags,serviceFit:input.serviceFit,createdByType:input.createdByType,createdById:input.createdById}).returning();return mapQualification(r);
+    if(existing){
+      if(expectedVersion==null)return null;
+      const [r]=await getDb().update(qualifications).set({
+        version:sql`${qualifications.version} + 1` as unknown as number,
+        decisionMakers:input.decisionMakers,
+        problemStatements:input.problemStatements,
+        desiredOutcome:input.desiredOutcome,
+        currentProcess:input.currentProcess,
+        urgency:input.urgency,
+        explicitBudgetStatement:input.explicitBudgetStatement,
+        timeline:input.timeline,
+        constraints:input.constraints,
+        technicalDependencies:input.technicalDependencies,
+        unansweredQuestions:input.unansweredQuestions,
+        riskFlags:input.riskFlags,
+        serviceFit:input.serviceFit,
+        createdByType:input.createdByType,
+        createdById:input.createdById,
+        updatedAt:new Date(),
+      }).where(and(eq(qualifications.id,existing.id),eq(qualifications.version,expectedVersion))).returning();
+      return r?mapQualification(r):null;
+    }
+    if(expectedVersion!=null)return null;
+    const [r]=await getDb().insert(qualifications).values({
+      leadId:input.leadId,
+      version:input.version,
+      decisionMakers:input.decisionMakers,
+      problemStatements:input.problemStatements,
+      desiredOutcome:input.desiredOutcome,
+      currentProcess:input.currentProcess,
+      urgency:input.urgency,
+      explicitBudgetStatement:input.explicitBudgetStatement,
+      timeline:input.timeline,
+      constraints:input.constraints,
+      technicalDependencies:input.technicalDependencies,
+      unansweredQuestions:input.unansweredQuestions,
+      riskFlags:input.riskFlags,
+      serviceFit:input.serviceFit,
+      createdByType:input.createdByType,
+      createdById:input.createdById,
+    }).returning();
+    return mapQualification(r);
   }
 
   async listProposals(leadId:string){return (await getDb().select().from(proposals).where(eq(proposals.leadId,leadId)).orderBy(desc(proposals.version))).map(mapProposal);}
@@ -163,7 +207,7 @@ export class PostgresAutomationRepository implements AutomationRepository {
   async listContracts(leadId:string){return (await getDb().select().from(contracts).where(eq(contracts.leadId,leadId)).orderBy(desc(contracts.version))).map(mapContract);}
   async getContract(id:string){const [r]=await getDb().select().from(contracts).where(eq(contracts.id,id)).limit(1);return r?mapContract(r):null;}
   async createContract(input:Omit<Contract,"id"|"createdAt"|"updatedAt">){
-    const [r]=await getDb().insert(contracts).values({leadId:input.leadId,proposalId:input.proposalId,templateId:input.templateId,templateVersion:input.templateVersion,version:input.version,status:input.status,parties:input.parties,terms:input.terms,responsibilitiesAgency:input.responsibilitiesAgency,responsibilitiesClient:input.responsibilitiesClient,paymentObligations:input.paymentObligations,deliverables:input.deliverables,supportObligations:input.supportObligations,renderedContent:input.renderedContent,artifactRef:input.artifactRef,approvalId:input.approvalId,signatureProvider:input.signatureProvider,externalSignatureId:input.externalSignatureId,signedArtifactRef:input.signedArtifactRef,signedAt:input.signedAt?new Date(input.signedAt):null,createdByType:input.createdByType,createdById:input.createdById}).returning();return mapContract(r);
+    const [r]=await getDb().insert(contracts).values({leadId:input.leadId,proposalId:input.proposalId,proposalVersion:input.proposalVersion,proposalSnapshotHash:input.proposalSnapshotHash,proposalSnapshot:input.proposalSnapshot,templateId:input.templateId,templateVersion:input.templateVersion,version:input.version,status:input.status,parties:input.parties,terms:input.terms,responsibilitiesAgency:input.responsibilitiesAgency,responsibilitiesClient:input.responsibilitiesClient,paymentObligations:input.paymentObligations,deliverables:input.deliverables,supportObligations:input.supportObligations,renderedContent:input.renderedContent,artifactRef:input.artifactRef,approvalId:input.approvalId,signatureProvider:input.signatureProvider,externalSignatureId:input.externalSignatureId,signedArtifactRef:input.signedArtifactRef,signedAt:input.signedAt?new Date(input.signedAt):null,createdByType:input.createdByType,createdById:input.createdById}).returning();return mapContract(r);
   }
   async updateContract(id:string,expectedVersion:number|undefined,changes:Partial<Contract>){
     const conditions=[eq(contracts.id,id)];if(expectedVersion!=null)conditions.push(eq(contracts.version,expectedVersion));
@@ -173,14 +217,19 @@ export class PostgresAutomationRepository implements AutomationRepository {
   async listProjects(leadId:string){return (await getDb().select().from(clientProjects).where(eq(clientProjects.leadId,leadId)).orderBy(desc(clientProjects.createdAt))).map(mapProject);}
   async getProjectByContract(contractId:string){const [r]=await getDb().select().from(clientProjects).where(eq(clientProjects.contractId,contractId)).limit(1);return r?mapProject(r):null;}
   async createProject(input:Omit<ClientProject,"id"|"createdAt"|"updatedAt">){
-    const [r]=await getDb().insert(clientProjects).values({leadId:input.leadId,contractId:input.contractId,name:input.name,status:input.status,ownerUserId:input.ownerUserId,startedAt:input.startedAt?new Date(input.startedAt):null,targetAt:input.targetAt?new Date(input.targetAt):null,completedAt:input.completedAt?new Date(input.completedAt):null}).returning();return mapProject(r);
+    const [r]=await getDb().insert(clientProjects).values({leadId:input.leadId,contractId:input.contractId,name:input.name,status:input.status,ownerUserId:input.ownerUserId,startedAt:input.startedAt?new Date(input.startedAt):null,targetAt:input.targetAt?new Date(input.targetAt):null,completedAt:input.completedAt?new Date(input.completedAt):null}).onConflictDoNothing({target:clientProjects.contractId}).returning();
+    if(r)return mapProject(r);
+    const existing=await this.getProjectByContract(input.contractId);if(!existing)throw new Error("Project conflict without existing row");return existing;
   }
   async updateProject(id:string,changes:Partial<ClientProject>){
     const [r]=await getDb().update(clientProjects).set({name:changes.name,status:changes.status,ownerUserId:changes.ownerUserId,startedAt:changes.startedAt?new Date(changes.startedAt):changes.startedAt===null?null:undefined,targetAt:changes.targetAt?new Date(changes.targetAt):changes.targetAt===null?null:undefined,completedAt:changes.completedAt?new Date(changes.completedAt):changes.completedAt===null?null:undefined,updatedAt:new Date()}).where(eq(clientProjects.id,id)).returning();return r?mapProject(r):null;
   }
   async listObligations(projectId:string){return (await getDb().select().from(projectObligations).where(eq(projectObligations.projectId,projectId)).orderBy(projectObligations.createdAt)).map(mapObligation);}
   async createObligation(input:Omit<ProjectObligation,"id"|"createdAt"|"updatedAt">){
-    const [r]=await getDb().insert(projectObligations).values({projectId:input.projectId,sourceContractId:input.sourceContractId,party:input.party,kind:input.kind,title:input.title,description:input.description,status:input.status,dueAt:input.dueAt?new Date(input.dueAt):null,metadata:input.metadata}).returning();return mapObligation(r);
+    const [r]=await getDb().insert(projectObligations).values({projectId:input.projectId,sourceContractId:input.sourceContractId,sourceKey:input.sourceKey,party:input.party,kind:input.kind,title:input.title,description:input.description,status:input.status,dueAt:input.dueAt?new Date(input.dueAt):null,metadata:input.metadata}).onConflictDoNothing({target:[projectObligations.projectId,projectObligations.sourceKey]}).returning();
+    if(r)return mapObligation(r);
+    const [existing]=await getDb().select().from(projectObligations).where(and(eq(projectObligations.projectId,input.projectId),eq(projectObligations.sourceKey,input.sourceKey))).limit(1);
+    if(!existing)throw new Error("Obligation conflict without existing row");return mapObligation(existing);
   }
   async updateObligation(id:string,changes:Partial<ProjectObligation>){
     const [r]=await getDb().update(projectObligations).set({status:changes.status,dueAt:changes.dueAt?new Date(changes.dueAt):changes.dueAt===null?null:undefined,description:changes.description,metadata:changes.metadata,updatedAt:new Date()}).where(eq(projectObligations.id,id)).returning();return r?mapObligation(r):null;

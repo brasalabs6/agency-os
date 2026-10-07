@@ -34,6 +34,7 @@ export interface AutomationRepository {
 
   listConversations(filters?: { leadId?: string; connectionId?: string; limit?: number }): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | null>;
+  getConversationByExternal(connectionId: string, externalId: string): Promise<Conversation | null>;
   upsertConversation(input: Omit<Conversation, "id" | "createdAt" | "updatedAt">): Promise<Conversation>;
   linkConversation(id: string, leadId: string | null, optOutDetected?: boolean): Promise<Conversation | null>;
 
@@ -46,7 +47,10 @@ export interface AutomationRepository {
   updateApproval(id: string, expectedVersion: number | undefined, changes: Partial<ApprovalRequest>): Promise<ApprovalRequest | null>;
 
   getQualification(leadId: string): Promise<Qualification | null>;
-  upsertQualification(input: Omit<Qualification, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<Qualification>;
+  upsertQualification(
+    input: Omit<Qualification, "id" | "createdAt" | "updatedAt"> & { id?: string },
+    expectedVersion?: number,
+  ): Promise<Qualification | null>;
 
   listProposals(leadId: string): Promise<Proposal[]>;
   getProposal(id: string): Promise<Proposal | null>;

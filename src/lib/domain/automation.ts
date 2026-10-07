@@ -6,7 +6,7 @@ export type DiagnosticStatus = (typeof DIAGNOSTIC_STATUSES)[number];
 export const AI_RUN_STATUSES = ["QUEUED", "RUNNING", "WAITING_APPROVAL", "COMPLETED", "FAILED", "CANCELED"] as const;
 export type AiRunStatus = (typeof AI_RUN_STATUSES)[number];
 
-export const APPROVAL_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EXPIRED", "EXECUTED", "CANCELED"] as const;
+export const APPROVAL_STATUSES = ["PENDING", "APPROVED", "EXECUTING", "REJECTED", "EXPIRED", "EXECUTED", "CANCELED"] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
 
 export const APPROVAL_ACTION_TYPES = [
@@ -268,6 +268,9 @@ export interface Contract {
   id: string;
   leadId: string;
   proposalId: string;
+  proposalVersion: number;
+  proposalSnapshotHash: string;
+  proposalSnapshot: Record<string, unknown>;
   templateId: string;
   templateVersion: string;
   version: number;
@@ -310,6 +313,7 @@ export interface ProjectObligation {
   id: string;
   projectId: string;
   sourceContractId: string;
+  sourceKey: string;
   party: "AGENCY" | "CLIENT";
   kind: "DELIVERABLE" | "MILESTONE" | "PAYMENT" | "APPROVAL" | "SUPPORT" | "DEPENDENCY" | "OTHER";
   title: string;
