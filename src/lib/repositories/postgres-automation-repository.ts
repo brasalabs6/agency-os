@@ -148,10 +148,50 @@ export class PostgresAutomationRepository implements AutomationRepository {
   }
 
   async getQualification(leadId:string){const [r]=await getDb().select().from(qualifications).where(eq(qualifications.leadId,leadId)).orderBy(desc(qualifications.updatedAt)).limit(1);return r?mapQualification(r):null;}
-  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string}){
+  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string},expectedVersion?:number){
     const existing=await this.getQualification(input.leadId);
-    if(existing){const [r]=await getDb().update(qualifications).set({version:existing.version+1,decisionMakers:input.decisionMakers,problemStatements:input.problemStatements,desiredOutcome:input.desiredOutcome,currentProcess:input.currentProcess,urgency:input.urgency,explicitBudgetStatement:input.explicitBudgetStatement,timeline:input.timeline,constraints:input.constraints,technicalDependencies:input.technicalDependencies,unansweredQuestions:input.unansweredQuestions,riskFlags:input.riskFlags,serviceFit:input.serviceFit,createdByType:input.createdByType,createdById:input.createdById,updatedAt:new Date()}).where(eq(qualifications.id,existing.id)).returning();return mapQualification(r);}
-    const [r]=await getDb().insert(qualifications).values({leadId:input.leadId,version:input.version,decisionMakers:input.decisionMakers,problemStatements:input.problemStatements,desiredOutcome:input.desiredOutcome,currentProcess:input.currentProcess,urgency:input.urgency,explicitBudgetStatement:input.explicitBudgetStatement,timeline:input.timeline,constraints:input.constraints,technicalDependencies:input.technicalDependencies,unansweredQuestions:input.unansweredQuestions,riskFlags:input.riskFlags,serviceFit:input.serviceFit,createdByType:input.createdByType,createdById:input.createdById}).returning();return mapQualification(r);
+    if(existing){
+      if(expectedVersion==null)return null;
+      const [r]=await getDb().update(qualifications).set({
+        version:sql`${qualifications.version} + 1` as unknown as number,
+        decisionMakers:input.decisionMakers,
+        problemStatements:input.problemStatements,
+        desiredOutcome:input.desiredOutcome,
+        currentProcess:input.currentProcess,
+        urgency:input.urgency,
+        explicitBudgetStatement:input.explicitBudgetStatement,
+        timeline:input.timeline,
+        constraints:input.constraints,
+        technicalDependencies:input.technicalDependencies,
+        unansweredQuestions:input.unansweredQuestions,
+        riskFlags:input.riskFlags,
+        serviceFit:input.serviceFit,
+        createdByType:input.createdByType,
+        createdById:input.createdById,
+        updatedAt:new Date(),
+      }).where(and(eq(qualifications.id,existing.id),eq(qualifications.version,expectedVersion))).returning();
+      return r?mapQualification(r):null;
+    }
+    if(expectedVersion!=null)return null;
+    const [r]=await getDb().insert(qualifications).values({
+      leadId:input.leadId,
+      version:input.version,
+      decisionMakers:input.decisionMakers,
+      problemStatements:input.problemStatements,
+      desiredOutcome:input.desiredOutcome,
+      currentProcess:input.currentProcess,
+      urgency:input.urgency,
+      explicitBudgetStatement:input.explicitBudgetStatement,
+      timeline:input.timeline,
+      constraints:input.constraints,
+      technicalDependencies:input.technicalDependencies,
+      unansweredQuestions:input.unansweredQuestions,
+      riskFlags:input.riskFlags,
+      serviceFit:input.serviceFit,
+      createdByType:input.createdByType,
+      createdById:input.createdById,
+    }).returning();
+    return mapQualification(r);
   }
 
   async listProposals(leadId:string){return (await getDb().select().from(proposals).where(eq(proposals.leadId,leadId)).orderBy(desc(proposals.version))).map(mapProposal);}
