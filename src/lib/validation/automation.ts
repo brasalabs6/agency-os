@@ -1,5 +1,6 @@
 import * as z from "zod/v4";
 import { APPROVAL_ACTION_TYPES, DIAGNOSTIC_STATUSES } from "@/lib/domain/automation";
+import { SERVICE_OPPORTUNITIES } from "@/lib/domain/types";
 
 export const profileFactSchema = z.object({
   key: z.string().min(1).max(200),
@@ -29,7 +30,7 @@ export const diagnosticFindingSchema = z.object({
 });
 
 export const diagnosticRecommendationSchema = z.object({
-  service: z.string().min(1).max(100),
+  service: z.enum(SERVICE_OPPORTUNITIES),
   rationale: z.string().min(1).max(5000),
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]),
 });
