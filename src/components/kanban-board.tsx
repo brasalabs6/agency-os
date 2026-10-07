@@ -10,11 +10,13 @@ import { LeadScore } from "./lead-score";
 import { DateLabel } from "./date-label";
 import { useI18n } from "./i18n-provider";
 
+type PipelineGroupId = (typeof PIPELINE_GROUPS)[number]["id"];
+
 export function KanbanBoard({ initialLeads }: { initialLeads: Lead[] }) {
   const { t } = useI18n();
   const [leads, setLeads] = useState(initialLeads);
   const [moving, setMoving] = useState<string | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState(PIPELINE_GROUPS[0].id);
+  const [selectedGroupId, setSelectedGroupId] = useState<PipelineGroupId>(PIPELINE_GROUPS[0].id);
   const groups = useMemo(() => PIPELINE_GROUPS.map((group) => ({ ...group, leads: leads.filter((lead) => group.statuses.includes(lead.status)) })), [leads]);
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? groups[0];
 
