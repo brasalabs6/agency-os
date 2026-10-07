@@ -126,9 +126,10 @@ export class MockAutomationRepository implements AutomationRepository {
   }
 
   async getQualification(leadId:string){return clone(this.qualifications.find((x)=>x.leadId===leadId)??null);}
-  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string}){
+  async upsertQualification(input:Omit<Qualification,"id"|"createdAt"|"updatedAt">&{id?:string},expectedVersion?:number){
     const i=this.qualifications.findIndex((x)=>x.leadId===input.leadId);const ts=now();
-    if(i>=0){const cur=this.qualifications[i];const updated={...cur,...input,id:cur.id,version:cur.version+1,updatedAt:ts};this.qualifications[i]=updated;return clone(updated);}
+    if(i>=0){const cur=this.qualifications[i];if(expectedVersion==null||cur.version!==expectedVersion)return null;const updated={...cur,...input,id:cur.id,version:cur.version+1,updatedAt:ts};this.qualifications[i]=updated;return clone(updated);}
+    if(expectedVersion!=null)return null;
     const {id:_id,...rest}=input;const item:Qualification={id:randomUUID(),...rest,createdAt:ts,updatedAt:ts};this.qualifications.push(item);return clone(item);
   }
 
