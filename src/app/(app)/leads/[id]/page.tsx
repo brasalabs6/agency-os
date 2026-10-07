@@ -44,6 +44,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <section className="surface-flat rounded-xl p-4"><h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Evidências</h2><div className="mt-3 space-y-3">{evidence.map((item) => <div key={item.id} className="rounded-lg bg-[var(--panel-2)] p-3"><div className="text-[10px] uppercase text-muted">{item.claim}</div><div className="mt-1 text-xs font-medium">{item.value}</div><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 flex min-w-0 items-center gap-1 text-[10px] text-muted hover:text-[var(--accent)]"><ExternalLink size={10} className="shrink-0"/><span className="truncate">{item.sourceUrl}</span></a></div>)}{evidence.length === 0 ? <p className="text-xs text-muted">Nenhuma evidência registrada.</p> : null}</div></section>
       </aside>
     </div>
+
+    <div className="mt-5">
+      <LeadAutomationPanel leadId={lead.id} data={automation}/>
+    </div>
   </>;
 }
 
