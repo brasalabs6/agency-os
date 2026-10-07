@@ -92,18 +92,24 @@ Approval lifecycle:
 PENDING
 → APPROVED | REJECTED | EXPIRED | CANCELED
 APPROVED
+→ EXECUTING
+EXECUTING
 → EXECUTED
+→ EXECUTING again only after the execution lease expires, using the same idempotency key
 ```
 
 Rules:
 
 1. agent creates request;
 2. human reviews/edits exact preview + structured payload;
-3. AgencyOS recalculates the payload hash at human approval;
-4. executor accepts only `APPROVED`;
-5. executor rejects expired, stale-version, changed-payload or failing-policy requests;
-6. contact actions re-check current DO_NOT_CONTACT immediately before execution;
-7. execution receipt is persisted and audited.
+3. AgencyOS recalculates a canonical JSON SHA-256 payload hash at human approval;
+4. only ADMIN users receive `approvals.approve`; MEMBER users can inspect but cannot approve/reject;
+5. specialized proposal/contract approvals can only be created through their specialized state machines;
+6. executor validates expiry, payload hash, policy checks, lead/entity binding, expected status/version and DO_NOT_CONTACT;
+7. executor atomically claims `APPROVED → EXECUTING` before any external side effect;
+8. provider calls receive `Idempotency-Key: <approvalId>`; production adapters MUST honor this key;
+9. an active execution lease rejects concurrent retries; an expired lease may be reclaimed using the same idempotency key for crash recovery;
+10. execution receipt is persisted and audited before the workflow is considered complete.
 
 Human approval/rejection is intentionally absent from MCP scopes/tools.
 
@@ -119,7 +125,9 @@ Header:
 
 `Authorization: Bearer <WHATSAPP_INGEST_TOKEN>`
 
-Messages are upserted by external identity and conversation. Opt-out detection can project a lead to `DO_NOT_CONTACT`.
+Messages are upserted by external identity and conversation. Gateway ingest preserves an existing lead binding when `leadId` is omitted, treats opt-out as monotonic, and projects the already-linked lead to `DO_NOT_CONTACT` even when the gateway does not know the internal lead ID. Clearing/rebinding is a deliberate human operation.
+
+WhatsApp approval requests must be bound to a lead and the recipient must match the lead's registered phone/WhatsApp or a linked WhatsApp conversation. This prevents omitting `leadId` to bypass DNC enforcement.
 
 ### Approved send
 
@@ -139,7 +147,9 @@ Approved proposal/contract delivery uses a provider-neutral adapter:
 - `DOCUMENT_SEND_WEBHOOK_URL` for production.
 - `DOCUMENT_SEND_API_TOKEN` optional bearer token.
 
-Approval payload includes the exact document version and delivery target. Execution rejects stale document versions.
+Approval payload includes the exact document version and delivery target. Proposal/contract content identity is immutable once it enters approval. Execution rejects stale document versions.
+
+Contracts persist `proposalId`, `proposalVersion`, a canonical `proposalSnapshotHash` and the immutable proposal snapshot used to generate the contract. Contracts can only be generated from an `ACCEPTED` proposal and only `DRAFT` proposals/contracts are editable.
 
 ## Signature status
 
@@ -151,7 +161,9 @@ Header:
 
 `Authorization: Bearer <SIGNATURE_WEBHOOK_TOKEN>`
 
-A signed contract projects the lead to `WON`. Creating a client project from that signed contract projects `WON → ONBOARDING`.
+Only a `SENT` contract may transition to `SIGNED` or `DECLINED`. Both are terminal; duplicate callbacks for the same external signature state are idempotent and provider callbacks require an external signature ID.
+
+A signed contract projects the lead to `WON`. Creating a client project from that signed contract projects `WON → ONBOARDING`. Project creation reconciles deterministic obligation `sourceKey` values, so retries complete partial work without duplicating obligations.
 
 ## REST surface
 
@@ -232,7 +244,7 @@ Lead detail now includes:
 - project / obligations;
 - AI run ledger.
 
-The approval inbox supports human payload/preview editing before approve/reject and explicit execution after approval.
+The approval inbox lets ADMIN users approve/reject. MEMBER users are read-only for approval decisions. Specialized proposal/contract document identity and preview are immutable during review; only permitted operational payload fields such as delivery destination can change. `EXECUTING` is shown as an in-flight/recovery state rather than a resend opportunity.
 
 ## Compatibility
 
@@ -269,14 +281,23 @@ Recommended rollout:
 
 ## Test gates
 
-Added unit coverage includes:
+Added regression coverage includes:
 
 - `WON → ONBOARDING` and terminal-state behavior;
-- optimistic approval versioning;
-- AI-run idempotency lookup;
-- agents cannot self-approve;
-- pending WhatsApp cannot execute;
-- an exact human-approved WhatsApp payload executes in mock mode.
+- canonical payload hashing;
+- ADMIN-only approval decisions;
+- generic specialized-approval bypass prevention;
+- atomic `APPROVED → EXECUTING` claim, idempotent execution and stale-lease recovery;
+- contact target ↔ lead binding and DNC enforcement;
+- WhatsApp ingest binding preservation and monotonic opt-out;
+- proposal request → approval → send → accepted without stale versions;
+- proposal immutability after externalization;
+- exact proposal snapshot/hash captured in the contract;
+- contract request → approval → send → signed;
+- invalid/terminal signature transitions and duplicate callback idempotency;
+- diagnostic immutability after finalization;
+- cross-lead relation rejection;
+- partial project retry reconciliation without duplicate obligations.
 
 Repository CI remains the required gate:
 
