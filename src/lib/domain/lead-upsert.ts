@@ -81,7 +81,7 @@ export function buildLeadEnrichmentPatch(input: CreateLeadInput, current: Lead):
   for (const field of stringFields) {
     const incoming = input[field];
     if (incoming == null) continue;
-    if (!sameString(field, incoming, current[field])) patch[field] = incoming;
+    if (!sameString(field, incoming, current[field])) Object.assign(patch, { [field]: incoming });
   }
 
   if (input.score != null && input.score !== current.score) patch.score = input.score;
