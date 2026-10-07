@@ -4,8 +4,9 @@ import type { ActorContext } from "@/lib/domain/types";
 import type { McpCredential, PublicMcpCredential } from "@/lib/auth/mcp-types";
 import { generateMcpCredentialSecret, hashMcpCredentialSecret, looksLikeMcpCredentialSecret, mcpCredentialPrefix } from "@/lib/auth/mcp-credential";
 import { getLeadRepository, getMcpCredentialRepository } from "@/lib/repositories";
+import { AGENT_SCOPES } from "@/lib/auth/scopes";
 
-const DEFAULT_SCOPES = ["leads.read", "leads.write"] as const;
+const DEFAULT_SCOPES = AGENT_SCOPES;
 
 function publicCredential(credential: McpCredential): PublicMcpCredential {
   const { tokenHash: _tokenHash, ...safe } = credential;

@@ -164,7 +164,7 @@ export class PostgresLeadRepository implements LeadRepository {
   async addAudit(input: AddAuditInput): Promise<AuditLog> {
     const rows = await getDb().insert(auditLogs).values({
       actorType: input.actor.type, actorId: input.actor.id, tool: input.tool, action: input.action,
-      leadId: input.leadId, input: input.input ?? {}, result: input.result ?? {},
+      leadId: input.leadId, entityType: input.entityType ?? null, entityId: input.entityId ?? null, input: input.input ?? {}, result: input.result ?? {},
     }).returning();
     const row = rows[0];
     return { ...row, createdAt: row.createdAt.toISOString() };

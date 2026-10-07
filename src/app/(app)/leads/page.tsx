@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { searchLeads, listUsers } from "@/lib/services/leads";
 import { requireCurrentUser } from "@/lib/auth/app-auth";
 import type { LeadSearchFilters } from "@/lib/domain/types";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const raw = await searchParams;
@@ -24,5 +25,6 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   else if (values.owner) filters.ownerId = values.owner;
   const result = await searchLeads(filters);
   const users = await listUsers();
-  return <><PageHeader title="Leads" description={`${result.total} leads encontrados`} action={<NewLeadButton/>}/><LeadFilters values={values} users={users} currentUserId={currentUser.id}/><LeadTable leads={result.items}/></>;
+  const { t } = await getI18n();
+  return <><PageHeader title={t("leads.title")} description={t("leads.found",{count:result.total})} action={<NewLeadButton/>}/><LeadFilters values={values} users={users} currentUserId={currentUser.id}/><LeadTable leads={result.items}/></>;
 }

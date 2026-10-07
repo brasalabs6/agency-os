@@ -1,8 +1,11 @@
 "use client";
+
 import { Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
+import { useI18n } from "./i18n-provider";
 
 export function ThemeToggle() {
+  const { t } = useI18n();
   useEffect(() => {
     const saved = localStorage.getItem("agencyos-theme");
     const enabled = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -15,8 +18,8 @@ export function ThemeToggle() {
     localStorage.setItem("agencyos-theme", next ? "dark" : "light");
   }
 
-  return <button onClick={toggle} className="focus-ring rounded-md p-2 text-muted hover:bg-[var(--panel-2)] hover:text-[var(--text)]" aria-label="Alternar tema">
-    <Moon size={16} className="dark:hidden"/>
-    <Sun size={16} className="hidden dark:block"/>
+  return <button onClick={toggle} className="focus-ring grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-[var(--panel-2)] hover:text-[var(--text)]" aria-label={t("common.toggleTheme")}>
+    <Moon size={17} className="dark:hidden"/>
+    <Sun size={17} className="hidden dark:block"/>
   </button>;
 }

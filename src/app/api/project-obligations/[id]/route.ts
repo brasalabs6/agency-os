@@ -1,0 +1,2 @@
+import { apiActor,errorResponse,ok } from "@/lib/services/http";import { obligationUpdateSchema } from "@/lib/validation/automation";import { updateProjectObligation } from "@/lib/services/client-projects";
+export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){try{const actor=await apiActor();const{id}=await params;return ok(await updateProjectObligation(id,obligationUpdateSchema.parse(await request.json()),actor));}catch(error){return errorResponse(error);}}
