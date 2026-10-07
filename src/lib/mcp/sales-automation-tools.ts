@@ -45,9 +45,9 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     description: "Save structured discovery facts, unknowns, decision makers, constraints and service fit.",
     annotations: mcpWriteAnnotations,
     inputSchema: qualificationSchema.extend({ leadId: z.string().uuid() }),
-  }, async ({ leadId, ...input }) => {
+  }, async ({ leadId, expectedVersion, ...input }) => {
     requireScope(actor, "leads.write");
-    return mcpTextResult(await upsertQualification(leadId, input, actor, "lead_qualification_update"));
+    return mcpTextResult(await upsertQualification(leadId, input, expectedVersion, actor, "lead_qualification_update"));
   });
 
   server.registerTool("proposal_list", {
@@ -94,10 +94,10 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     title: "Request proposal send approval",
     description: "Create a human approval request before sending a priced proposal.",
     annotations: mcpWriteAnnotations,
-    inputSchema: z.object({ proposalId: z.string().uuid(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
-  }, async ({ proposalId, delivery }) => {
+    inputSchema: z.object({ proposalId: z.string().uuid(), expectedVersion: z.number().int().positive(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
+  }, async ({ proposalId, expectedVersion, delivery }) => {
     requireScope(actor, "approvals.request");
-    return mcpTextResult(await requestProposalApproval(proposalId, actor, "proposal_request_approval", delivery));
+    return mcpTextResult(await requestProposalApproval(proposalId, expectedVersion, actor, "proposal_request_approval", delivery));
   });
 
   server.registerTool("proposal_send_approved", {
@@ -118,10 +118,11 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
       proposalId: z.string().uuid(),
       status: z.enum(["ACCEPTED", "REJECTED"]),
       notes: z.string().max(5000).optional(),
+      expectedVersion: z.number().int().positive(),
     }),
-  }, async ({ proposalId, status, notes }) => {
+  }, async ({ proposalId, status, notes, expectedVersion }) => {
     requireScope(actor, "proposals.write");
-    return mcpTextResult(await markProposalResponse(proposalId, status, notes, actor, "proposal_mark_response"));
+    return mcpTextResult(await markProposalResponse(proposalId, status, notes, expectedVersion, actor, "proposal_mark_response"));
   });
 
   server.registerTool("contract_list", {
@@ -156,7 +157,7 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
 
   server.registerTool("contract_update_draft", {
     title: "Update contract draft",
-    description: "Edit only DRAFT/PENDING_REVIEW contract versions.",
+    description: "Edit only DRAFT contract versions using required optimistic concurrency.",
     annotations: mcpWriteAnnotations,
     inputSchema: contractUpdateSchema.extend({ contractId: z.string().uuid() }),
   }, async ({ contractId, expectedVersion, ...changes }) => {
@@ -168,10 +169,10 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     title: "Request contract send approval",
     description: "Create mandatory human/legal review request before contract send.",
     annotations: mcpWriteAnnotations,
-    inputSchema: z.object({ contractId: z.string().uuid(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
-  }, async ({ contractId, delivery }) => {
+    inputSchema: z.object({ contractId: z.string().uuid(), expectedVersion: z.number().int().positive(), delivery: z.object({ channel: z.enum(["EMAIL","WHATSAPP","OTHER"]), to: z.string().min(1) }) }),
+  }, async ({ contractId, expectedVersion, delivery }) => {
     requireScope(actor, "approvals.request");
-    return mcpTextResult(await requestContractApproval(contractId, actor, "contract_request_approval", delivery));
+    return mcpTextResult(await requestContractApproval(contractId, expectedVersion, actor, "contract_request_approval", delivery));
   });
 
   server.registerTool("contract_send_approved", {
