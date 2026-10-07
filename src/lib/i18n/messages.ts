@@ -30,6 +30,7 @@ const ptBR = {
   "common.errorUnexpected": "Erro inesperado",
   "common.portuguese": "Português",
   "common.english": "English",
+  "common.toggleTheme": "Alternar tema",
 
   "nav.overview": "Visão geral",
   "nav.leads": "Leads",
@@ -121,6 +122,7 @@ const ptBR = {
   "leads.opportunityDescription": "Hipótese comercial baseada em evidências registradas.",
   "leads.timeline": "Histórico",
   "leads.timelineDescription": "Atividades de humanos, agentes e sistema.",
+  "leads.noActivities": "Ainda não há atividades registradas.",
   "leads.contact": "Contato",
   "leads.noContact": "Sem dados de contato.",
   "leads.digitalPresence": "Presença digital",
@@ -443,6 +445,7 @@ const en: Record<MessageKey, string> = {
   "common.errorUnexpected": "Unexpected error",
   "common.portuguese": "Português",
   "common.english": "English",
+  "common.toggleTheme": "Toggle theme",
 
   "nav.overview": "Overview",
   "nav.leads": "Leads",
@@ -534,6 +537,7 @@ const en: Record<MessageKey, string> = {
   "leads.opportunityDescription": "Commercial hypothesis based on recorded evidence.",
   "leads.timeline": "Timeline",
   "leads.timelineDescription": "History from people, agents, and the system.",
+  "leads.noActivities": "No activities have been recorded yet.",
   "leads.contact": "Contact",
   "leads.noContact": "No contact information.",
   "leads.digitalPresence": "Digital presence",
