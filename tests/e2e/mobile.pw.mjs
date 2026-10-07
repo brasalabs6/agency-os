@@ -13,11 +13,29 @@ async function openApp(page) {
 }
 
 async function expectNoDocumentOverflow(page) {
-  const sizes = await page.evaluate(() => ({
-    scroll: document.documentElement.scrollWidth,
-    client: document.documentElement.clientWidth,
-  }));
-  expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
+  const result = await page.evaluate(() => {
+    const client = document.documentElement.clientWidth;
+    const scroll = document.documentElement.scrollWidth;
+    const offenders = scroll > client + 1
+      ? Array.from(document.querySelectorAll("body *"))
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              tag: element.tagName.toLowerCase(),
+              testid: element.getAttribute("data-testid"),
+              className: typeof element.className === "string" ? element.className.slice(0, 140) : "",
+              text: (element.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 100),
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width),
+            };
+          })
+          .filter((item) => item.right > client + 1 || item.left < -1)
+          .slice(0, 12)
+      : [];
+    return { client, scroll, offenders };
+  });
+  expect(result.scroll, JSON.stringify(result, null, 2)).toBeLessThanOrEqual(result.client + 1);
 }
 
 test("core CRM routes stay mobile-first across target viewports", async ({ page }) => {
