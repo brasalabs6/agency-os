@@ -89,6 +89,10 @@ export class PostgresLeadRepository implements LeadRepository {
     return row[0] ? mapLead(row[0], people) : null;
   }
 
+  async lockForUpdate(id: string): Promise<void> {
+    await getDb().execute(sql`select id from ${leads} where ${leads.id} = ${id} for update`);
+  }
+
   async findDuplicate(input: CreateLeadInput) {
     const candidates: SQL[] = [];
     if (input.website) candidates.push(eq(leads.website, input.website));

@@ -42,6 +42,7 @@ export interface AddAuditInput {
 export interface LeadRepository {
   search(filters: LeadSearchFilters): Promise<LeadSearchResult>;
   getById(id: string): Promise<Lead | null>;
+  lockForUpdate(id: string): Promise<void>;
   findDuplicate(input: CreateLeadInput): Promise<Lead | null>;
   create(input: CreateLeadInput): Promise<Lead>;
   update(id: string, input: UpdateLeadInput): Promise<Lead | null>;

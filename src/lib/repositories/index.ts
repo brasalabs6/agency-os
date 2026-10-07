@@ -1,3 +1,4 @@
+import { withDbTransaction } from "@/lib/db/client";
 import type { LeadRepository } from "./lead-repository";
 import type { TaskRepository } from "./task-repository";
 import { mockLeadRepository } from "./mock-lead-repository";
@@ -32,4 +33,9 @@ export function getAuthRepository(): AuthRepository {
 
 export function getMcpCredentialRepository(): McpCredentialRepository {
   return isPostgresDriver() ? postgresMcpCredentialRepository : mockMcpCredentialRepository;
+}
+
+
+export async function withRepositoryTransaction<T>(work: () => Promise<T>): Promise<T> {
+  return isPostgresDriver() ? withDbTransaction(work) : work();
 }

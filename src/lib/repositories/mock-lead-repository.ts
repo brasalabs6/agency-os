@@ -59,6 +59,10 @@ export class MockLeadRepository implements LeadRepository {
 
   async getById(id: string) { return clone(this.leads.find((lead) => lead.id === id) ?? null); }
 
+  async lockForUpdate(_id: string): Promise<void> {
+    // Mock storage is process-local and synchronous; there is no database row to lock.
+  }
+
   async findDuplicate(input: CreateLeadInput) {
     const domain = input.website ? normalize(input.website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]) : "";
     return clone(this.leads.find((lead) => {
