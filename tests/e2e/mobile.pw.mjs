@@ -76,6 +76,18 @@ test("core CRM routes stay mobile-first across target viewports", async ({ page 
       await page.goto(leadHref);
       await expect(page.locator("aside.order-1")).toBeVisible();
       await expectNoDocumentOverflow(page);
+
+      await page.goto("/prospecting");
+      await expect(page.getByRole("heading", { name: "Prospecção com IA" })).toBeVisible();
+      await expectNoDocumentOverflow(page);
+
+      await page.goto("/conversations");
+      await expect(page.getByRole("heading", { name: "WhatsApp & conversas" })).toBeVisible();
+      await expectNoDocumentOverflow(page);
+
+      await page.goto("/approvals");
+      await expect(page.getByRole("heading", { name: "Aprovações" })).toBeVisible();
+      await expectNoDocumentOverflow(page);
     });
   }
 });
@@ -91,6 +103,10 @@ test("language preference switches between Portuguese and English and persists",
 
   await page.goto("/tasks");
   await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible();
+  await expect(page.getByLabel("Language")).toHaveValue("en");
+
+  await page.goto("/prospecting");
+  await expect(page.getByRole("heading", { name: "AI prospecting" })).toBeVisible();
   await expect(page.getByLabel("Language")).toHaveValue("en");
 
   await page.getByLabel("Language").selectOption("pt-BR");

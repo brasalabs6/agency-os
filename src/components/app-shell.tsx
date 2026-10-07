@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Activity, Bot, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, Users, X } from "lucide-react";
+import { Activity, Bot, CalendarDays, CheckSquare2, KanbanSquare, LayoutDashboard, ListTodo, LogOut, Menu, MessageCircle, PanelLeftClose, PanelLeftOpen, Search, Settings, ShieldCheck, UserRound, Users, X } from "lucide-react";
 import type { AuthenticatedUser } from "@/lib/auth/types";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeToggle } from "./theme-toggle";
@@ -17,6 +17,9 @@ const nav: Array<{ href: string; label: MessageKey; icon: typeof LayoutDashboard
   { href: "/tasks", label: "nav.tasks", icon: CheckSquare2 },
   { href: "/calendar", label: "nav.calendar", icon: CalendarDays },
   { href: "/actions", label: "nav.actions", icon: ListTodo },
+  { href: "/prospecting", label: "nav.prospecting", icon: Search },
+  { href: "/conversations", label: "nav.conversations", icon: MessageCircle },
+  { href: "/approvals", label: "nav.approvals", icon: ShieldCheck },
 ];
 
 function isActive(pathname: string, href: string) {

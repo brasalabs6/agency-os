@@ -1,11 +1,51 @@
 import Link from "next/link";
 import { ChannelConnectionForm } from "@/components/channel-connection-form";
+import { PageHeader } from "@/components/page-header";
+import { buttonSecondaryClass } from "@/components/ui-kit";
 import { requireCurrentUser } from "@/lib/auth/app-auth";
+import { automationStatusMessageKey } from "@/lib/i18n/domain";
+import { intlLocale } from "@/lib/i18n/messages";
+import { getI18n } from "@/lib/i18n/server";
 import { listChannelConnections, listConversations } from "@/lib/services/communications";
 
-export default async function ConversationsPage(){
-  await requireCurrentUser();const[connections,conversations]=await Promise.all([listChannelConnections(),listConversations({limit:200})]);
-  return <><header className="mb-6"><h1 className="text-2xl font-semibold tracking-tight">WhatsApp & conversas</h1><p className="mt-1 text-sm text-muted">Sincronização read-only para análise por IA. Não existe envio bruto por agente; mensagens externas passam pela central de aprovações.</p></header>
-  <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]"><div className="space-y-4"><ChannelConnectionForm/><section className="surface-flat rounded-lg p-5"><h2 className="text-sm font-semibold">Conexões</h2><div className="mt-3 space-y-2">{connections.length?connections.map(c=><div key={c.id} className="rounded-lg border border-default p-3"><div className="flex justify-between gap-2 text-xs"><strong>{c.accountLabel}</strong><span>{c.status}</span></div><div className="mt-1 text-[10px] text-muted">{c.provider} · {c.capabilities.join(", ")}</div><code className="mt-2 block truncate text-[10px] text-muted">{c.id}</code></div>):<p className="text-xs text-muted">Nenhuma conexão registrada.</p>}</div></section></div>
-  <section className="surface-flat rounded-lg p-5"><h2 className="text-sm font-semibold">Conversas sincronizadas</h2><div className="mt-4 space-y-2">{conversations.length?conversations.map(c=><article key={c.id} className="rounded-lg border border-default p-4"><div className="flex flex-wrap justify-between gap-2"><div><div className="text-sm font-medium">{c.contactDisplayName??c.contactAddress}</div><div className="text-xs text-muted">{c.contactAddress}</div></div><div className="flex gap-2">{c.optOutDetected?<span className="rounded bg-red-50 px-2 py-1 text-[10px] text-red-700 dark:bg-red-950 dark:text-red-300">OPT-OUT</span>:null}{c.leadId?<Link className="rounded border border-default px-2 py-1 text-[10px]" href={"/leads/"+c.leadId}>Abrir lead</Link>:<span className="rounded border border-default px-2 py-1 text-[10px] text-muted">não vinculado</span>}</div></div><div className="mt-2 text-[10px] text-muted">{c.lastMessageAt?new Date(c.lastMessageAt).toLocaleString("pt-BR"):"Sem mensagens"}</div></article>):<p className="text-sm text-muted">Nenhuma conversa foi sincronizada ainda.</p>}</div></section></div></>;
+export default async function ConversationsPage() {
+  await requireCurrentUser();
+  const [connections, conversations, i18n] = await Promise.all([listChannelConnections(), listConversations({ limit: 200 }), getI18n()]);
+  const { locale, t } = i18n;
+  const formatDate = (value: string) => new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(value));
+
+  return <>
+    <PageHeader title={t("conversations.title")} description={t("conversations.description")}/>
+    <div className="grid min-w-0 gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="min-w-0 space-y-4">
+        <ChannelConnectionForm/>
+        <section className="surface-flat rounded-xl p-4 sm:p-5">
+          <h2 className="text-sm font-semibold">{t("conversations.connections")}</h2>
+          <div className="mt-3 space-y-2">
+            {connections.length ? connections.map((connection) => <div key={connection.id} className="min-w-0 rounded-xl border border-default p-3">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 text-xs"><strong className="min-w-0 break-words">{connection.accountLabel}</strong><span className="shrink-0 rounded-full bg-[var(--panel-2)] px-2 py-1">{t(automationStatusMessageKey(connection.status))}</span></div>
+              <div className="mt-1 break-words text-[11px] text-muted">{connection.provider} · {connection.capabilities.join(", ")}</div>
+              <code className="mt-2 block overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-muted">{connection.id}</code>
+            </div>) : <p className="py-5 text-center text-xs text-muted">{t("conversations.noConnections")}</p>}
+          </div>
+        </section>
+      </div>
+
+      <section className="surface-flat min-w-0 rounded-xl p-4 sm:p-5">
+        <h2 className="text-sm font-semibold">{t("conversations.synced")}</h2>
+        <div className="mt-4 space-y-2">
+          {conversations.length ? conversations.map((conversation) => <article key={conversation.id} className="min-w-0 rounded-xl border border-default p-4">
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0"><div className="break-words text-sm font-medium">{conversation.contactDisplayName ?? conversation.contactAddress}</div><div className="mt-0.5 break-all text-xs text-muted">{conversation.contactAddress}</div></div>
+              <div className="flex flex-wrap items-center gap-2">
+                {conversation.optOutDetected ? <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700 dark:bg-red-950 dark:text-red-300">OPT-OUT</span> : null}
+                {conversation.leadId ? <Link className={buttonSecondaryClass} href={"/leads/" + conversation.leadId}>{t("conversations.openLead")}</Link> : <span className="inline-flex min-h-11 items-center rounded-lg border border-default px-3 text-xs text-muted">{t("conversations.unlinked")}</span>}
+              </div>
+            </div>
+            <div className="mt-3 text-xs text-muted">{conversation.lastMessageAt ? formatDate(conversation.lastMessageAt) : t("conversations.noMessages")}</div>
+          </article>) : <p className="py-8 text-center text-sm text-muted">{t("conversations.noneSynced")}</p>}
+        </div>
+      </section>
+    </div>
+  </>;
 }

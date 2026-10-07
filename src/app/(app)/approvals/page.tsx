@@ -1,12 +1,26 @@
+import Link from "next/link";
 import { ApprovalInbox } from "@/components/approval-inbox";
+import { PageHeader } from "@/components/page-header";
+import { buttonSecondaryClass } from "@/components/ui-kit";
 import { requireCurrentUser } from "@/lib/auth/app-auth";
+import { getI18n } from "@/lib/i18n/server";
 import { listApprovals } from "@/lib/services/communications";
 
-export default async function ApprovalsPage({searchParams}:{searchParams:Promise<{leadId?:string;status?:string}>}){
+export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; status?: string }> }) {
   await requireCurrentUser();
-  const params=await searchParams;
-  const items=await listApprovals({leadId:params.leadId,status:params.status,limit:200});
-  return <><header className="mb-6"><h1 className="text-2xl font-semibold tracking-tight">Aprovações</h1><p className="mt-1 text-sm text-muted">Mensagens, propostas e contratos preparados por agentes só saem daqui depois de aprovação humana.</p></header>
-  <div className="mb-4 flex gap-2 text-xs"><a href="/approvals" className="rounded border border-default px-3 py-2">Todas</a><a href="/approvals?status=PENDING" className="rounded border border-default px-3 py-2">Pendentes</a><a href="/approvals?status=APPROVED" className="rounded border border-default px-3 py-2">Aprovadas</a></div>
-  <ApprovalInbox items={items}/></>;
+  const params = await searchParams;
+  const [items, i18n] = await Promise.all([listApprovals({ leadId: params.leadId, status: params.status, limit: 200 }), getI18n()]);
+  const { t } = i18n;
+  const query = params.leadId ? `&leadId=${encodeURIComponent(params.leadId)}` : "";
+  const allHref = params.leadId ? `/approvals?leadId=${encodeURIComponent(params.leadId)}` : "/approvals";
+
+  return <>
+    <PageHeader title={t("approvals.title")} description={t("approvals.description")}/>
+    <div className="mb-4 flex flex-wrap gap-2">
+      <Link href={allHref} className={buttonSecondaryClass}>{t("approvals.all")}</Link>
+      <Link href={`/approvals?status=PENDING${query}`} className={buttonSecondaryClass}>{t("approvals.pending")}</Link>
+      <Link href={`/approvals?status=APPROVED${query}`} className={buttonSecondaryClass}>{t("approvals.approved")}</Link>
+    </div>
+    <ApprovalInbox items={items}/>
+  </>;
 }

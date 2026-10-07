@@ -24,3 +24,19 @@ export function pipelineGroupMessageKey(groupId: string): MessageKey {
 export function serviceMessageKey(service: ServiceOpportunity): MessageKey {
   return `service.${service}` as MessageKey;
 }
+
+export function automationStatusMessageKey(status: string): MessageKey {
+  return `automation.status.${status}` as MessageKey;
+}
+export function automationActionMessageKey(action: string): MessageKey {
+  return `automation.action.${action}` as MessageKey;
+}
+export function automationSeverityMessageKey(severity: string): MessageKey {
+  return `automation.severity.${severity}` as MessageKey;
+}
+export function automationFactMessageKey(classification: string): MessageKey {
+  return `automation.fact.${classification}` as MessageKey;
+}
+export function prospectingSkillMessageKey(skill: string): MessageKey {
+  return `prospecting.skill.${skill}` as MessageKey;
+}
