@@ -1,0 +1,2 @@
+import { apiActor,created,errorResponse } from "@/lib/services/http";import { projectCreateSchema } from "@/lib/validation/automation";import { createProjectFromSignedContract } from "@/lib/services/client-projects";
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const actor=await apiActor();const{id}=await params;return created(await createProjectFromSignedContract(id,projectCreateSchema.parse(await request.json().catch(()=>({}))),actor));}catch(error){return errorResponse(error);}}
