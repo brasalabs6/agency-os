@@ -173,6 +173,70 @@ export async function linkConversation(
   return updated;
 }
 
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+async function validateExternalTarget(
+  actionType: ApprovalActionType,
+  leadId: string | null | undefined,
+  payload: Record<string, unknown>,
+) {
+  const directChannel = actionType === "WHATSAPP_SEND"
+    ? "WHATSAPP"
+    : actionType === "EMAIL_SEND"
+      ? "EMAIL"
+      : null;
+  const delivery = payload.delivery && typeof payload.delivery === "object"
+    ? payload.delivery as { channel?: string; to?: string }
+    : null;
+  const channel = directChannel ?? delivery?.channel ?? null;
+  const rawTarget = directChannel ? String(payload.to ?? "") : String(delivery?.to ?? "");
+
+  if (channel !== "WHATSAPP" && channel !== "EMAIL") return;
+  if (!leadId) {
+    throw new DomainError(
+      "Contact actions must be bound to a lead",
+      "CONTACT_ACTION_LEAD_REQUIRED",
+      422,
+    );
+  }
+  if (!rawTarget) {
+    throw new DomainError("Contact target is required", "CONTACT_TARGET_REQUIRED", 422);
+  }
+
+  const { lead } = await getLead(leadId);
+  if (channel === "EMAIL") {
+    const allowed = new Set([lead.email].filter(Boolean).map((value) => String(value).trim().toLowerCase()));
+    if (!allowed.has(rawTarget.trim().toLowerCase())) {
+      throw new DomainError(
+        "Email target is not registered on this lead",
+        "CONTACT_TARGET_NOT_LINKED",
+        422,
+      );
+    }
+    return;
+  }
+
+  const allowed = new Set(
+    [lead.whatsapp, lead.phone]
+      .filter(Boolean)
+      .map((value) => normalizePhone(String(value))),
+  );
+  const conversations = await repo().listConversations({ leadId, limit: 200 });
+  for (const conversation of conversations) {
+    allowed.add(normalizePhone(conversation.contactAddress));
+  }
+  const normalizedTarget = normalizePhone(rawTarget);
+  if (!normalizedTarget || !allowed.has(normalizedTarget)) {
+    throw new DomainError(
+      "WhatsApp target is not registered or linked to this lead",
+      "CONTACT_TARGET_NOT_LINKED",
+      422,
+    );
+  }
+}
+
 async function defaultPolicyChecks(actionType: ApprovalActionType, leadId?: string | null): Promise<PolicyCheck[]> {
   const checks: PolicyCheck[] = [];
   if (leadId) {
@@ -215,6 +279,7 @@ export async function createApprovalRequest(
     );
   }
   if (input.leadId) await getLead(input.leadId);
+  await validateExternalTarget(input.actionType, input.leadId, input.payload);
   const checks = [
     ...(await defaultPolicyChecks(input.actionType, input.leadId)),
     ...(input.policyChecks ?? []),
@@ -316,6 +381,7 @@ export async function approveRequest(
   const payload = input.payload ?? before.payload;
   const preview = input.preview ?? before.preview;
   assertSpecializedApprovalEdit(before, payload, preview);
+  await validateExternalTarget(before.actionType, before.leadId, payload);
   const updated = await repo().updateApproval(id, input.expectedVersion, {
     payload,
     payloadHash: hashPayload(payload),
@@ -416,12 +482,30 @@ export async function claimApprovalForExecution(
     return { approval, alreadyExecuted: true as const };
   }
   if (approval.status === "EXECUTING") {
-    throw new DomainError(
-      "Approval execution is already in progress and must be reconciled before retry",
-      "APPROVAL_EXECUTION_IN_PROGRESS",
-      409,
-      { idempotencyKey: approval.id },
-    );
+    const startedAt = typeof approval.executionResult.startedAt === "string"
+      ? new Date(approval.executionResult.startedAt).getTime()
+      : 0;
+    const leaseSeconds = Number(process.env.APPROVAL_EXECUTION_LEASE_SECONDS ?? "300");
+    const leaseMs = Number.isFinite(leaseSeconds) && leaseSeconds >= 0 ? leaseSeconds * 1000 : 300000;
+    if (startedAt && Date.now() - startedAt < leaseMs) {
+      throw new DomainError(
+        "Approval execution is already in progress",
+        "APPROVAL_EXECUTION_IN_PROGRESS",
+        409,
+        { idempotencyKey: approval.id, retryAfterSeconds: Math.ceil((leaseMs - (Date.now() - startedAt)) / 1000) },
+      );
+    }
+    const resumed = await repo().updateApproval(approval.id, approval.version, {
+      status: "EXECUTING",
+      executionResult: {
+        ...approval.executionResult,
+        idempotencyKey: approval.id,
+        startedAt: nowIso(),
+        resumeCount: Number(approval.executionResult.resumeCount ?? 0) + 1,
+      },
+    });
+    if (!resumed) throwVersionConflict("Approval");
+    return { approval: resumed, alreadyExecuted: false as const };
   }
   if (approval.status !== "APPROVED") {
     throw new DomainError("Approval must be approved before execution", "APPROVAL_NOT_APPROVED", 409);
@@ -434,6 +518,7 @@ export async function claimApprovalForExecution(
   if (approval.policyChecks.some((check) => !check.passed)) {
     throw new DomainError("Approval has failing policy checks", "POLICY_CHECK_FAILED", 403);
   }
+  await validateExternalTarget(approval.actionType, approval.leadId, approval.payload);
 
   if (expectation.entity) {
     if (expectation.entity.status !== expectation.entity.expectedStatus) {
