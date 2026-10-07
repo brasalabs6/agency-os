@@ -127,4 +127,24 @@ Use the smallest set that covers the task:
 - `cicd-release-guardian`
 - `mcp-user-identity`
 
+Coding recipes:
+
+- `agencyos-vertical-slice`
+- `agencyos-api-route`
+- `agencyos-domain-command`
+- `agencyos-domain-guard`
+- `agencyos-optimistic-concurrency`
+- `agencyos-repository-adapter`
+- `agencyos-zod-boundary`
+- `agencyos-server-page`
+- `agencyos-client-mutation`
+- `agencyos-form-modal`
+- `agencyos-responsive-data-view`
+- `agencyos-ui-language`
+- `agencyos-auditable-mutation`
+- `agencyos-domain-derived-state`
+- `agencyos-testing-recipe`
+
+For implementation work, start with `agencyos-vertical-slice` and add only the focused recipes needed by the change.
+
 See `.agents/skills/README.md` for composition patterns.
