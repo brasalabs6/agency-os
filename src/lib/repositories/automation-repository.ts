@@ -34,6 +34,7 @@ export interface AutomationRepository {
 
   listConversations(filters?: { leadId?: string; connectionId?: string; limit?: number }): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | null>;
+  getConversationByExternal(connectionId: string, externalId: string): Promise<Conversation | null>;
   upsertConversation(input: Omit<Conversation, "id" | "createdAt" | "updatedAt">): Promise<Conversation>;
   linkConversation(id: string, leadId: string | null, optOutDetected?: boolean): Promise<Conversation | null>;
 
