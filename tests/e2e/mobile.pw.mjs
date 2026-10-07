@@ -7,14 +7,9 @@ const viewports = [
   { name: "768x1024", width: 768, height: 1024 },
 ];
 
-async function login(page) {
-  await page.goto("/login");
-  await page.locator('input[name="email"]').fill("guilherme@agency.local");
-  await page.locator('input[name="password"]').fill("admin-agencyos-2026");
-  await Promise.all([
-    page.waitForURL("**/"),
-    page.locator('form[action="/api/auth/login"] button').click(),
-  ]);
+async function openApp(page) {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/$/);
 }
 
 async function expectNoDocumentOverflow(page) {
@@ -26,7 +21,7 @@ async function expectNoDocumentOverflow(page) {
 }
 
 test("core CRM routes stay mobile-first across target viewports", async ({ page }) => {
-  await login(page);
+  await openApp(page);
 
   for (const viewport of viewports) {
     await test.step(viewport.name, async () => {
@@ -69,7 +64,7 @@ test("core CRM routes stay mobile-first across target viewports", async ({ page 
 
 test("language preference switches between Portuguese and English and persists", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await login(page);
+  await openApp(page);
 
   const language = page.getByLabel("Idioma");
   await language.selectOption("en");
