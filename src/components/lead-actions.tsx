@@ -45,11 +45,11 @@ export function LeadActions({ lead, users, currentUserId }: { lead: Lead; users:
   </>;
 
   return <>
-    <div className="relative lg:hidden">
+    <div className="relative min-w-0 lg:hidden">
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
-        <button onClick={() => setMode("contact")} disabled={lead.doNotContact} className={buttonSecondaryClass}>{t("leadActions.contact")}</button>
-        <button onClick={() => setMode("stage")} className={buttonPrimaryClass}>{t("leadActions.moveStage")}</button>
-        <button onClick={() => setMoreOpen((value) => !value)} className={buttonSecondaryClass} aria-expanded={moreOpen} aria-label={t("leadActions.moreActions")}><Ellipsis size={18}/></button>
+        <button onClick={() => setMode("contact")} disabled={lead.doNotContact} className={`${buttonSecondaryClass} min-w-0 px-2 text-center text-xs leading-tight sm:px-3 sm:text-sm`}>{t("leadActions.contact")}</button>
+        <button onClick={() => setMode("stage")} className={`${buttonPrimaryClass} min-w-0 px-2 text-center text-xs leading-tight sm:px-3 sm:text-sm`}>{t("leadActions.moveStage")}</button>
+        <button onClick={() => setMoreOpen((value) => !value)} className={`${buttonSecondaryClass} min-w-0 px-0`} aria-expanded={moreOpen} aria-label={t("leadActions.moreActions")}><Ellipsis size={18}/></button>
       </div>
       {moreOpen ? <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 grid min-w-[220px] gap-1 rounded-xl border border-default bg-[var(--panel)] p-2 shadow-xl">{secondaryActions}</div> : null}
     </div>
