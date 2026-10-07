@@ -6,8 +6,25 @@ import { getLeadRepository } from "@/lib/repositories";
 
 export const nowIso = () => new Date().toISOString();
 
+function canonicalizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (value && typeof value === "object") {
+    const source = value as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(source).sort()) {
+      if (source[key] !== undefined) result[key] = canonicalizeJson(source[key]);
+    }
+    return result;
+  }
+  return value;
+}
+
+export function canonicalJson(value: unknown) {
+  return JSON.stringify(canonicalizeJson(value));
+}
+
 export function hashPayload(payload: Record<string, unknown>) {
-  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+  return createHash("sha256").update(canonicalJson(payload)).digest("hex");
 }
 
 export async function automationAudit(
@@ -39,6 +56,13 @@ export function throwVersionConflict(entity: string): never {
 export function requireHumanActor(actor: ActorContext) {
   if (actor.type !== "USER") {
     throw new DomainError("This action requires a human user", "HUMAN_APPROVAL_REQUIRED", 403);
+  }
+}
+
+export function requireApprovalActor(actor: ActorContext) {
+  requireHumanActor(actor);
+  if (!actor.scopes?.includes("approvals.approve")) {
+    throw new DomainError("This user cannot approve external actions", "APPROVAL_PERMISSION_REQUIRED", 403);
   }
 }
 
