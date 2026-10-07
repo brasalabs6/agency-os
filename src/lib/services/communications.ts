@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { DomainError } from "@/lib/domain/errors";
 import type { ActorContext } from "@/lib/domain/types";
-import type { ApprovalActionType, ApprovalRequest, ChannelMessage, PolicyCheck } from "@/lib/domain/automation";
+import type { ApprovalActionType, ChannelMessage, PolicyCheck } from "@/lib/domain/automation";
 import { getAutomationRepository, getLeadRepository } from "@/lib/repositories";
 import { getLead, moveLeadStage } from "./leads";
 import {
