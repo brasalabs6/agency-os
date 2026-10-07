@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState } from "react";
-import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, type UserSummary } from "@/lib/domain/types";
+import { LEAD_STATUSES, SERVICE_OPPORTUNITIES, type LeadStatus, type UserSummary } from "@/lib/domain/types";
 import { statusMessageKey } from "@/lib/i18n/domain";
 import { ModalShell } from "./modal-shell";
 import { useI18n } from "./i18n-provider";
@@ -25,7 +25,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
     won: t("leads.won"),
   };
   const chips = [
-    values.status ? [t("leads.stage"), t(statusMessageKey(values.status as Parameters<typeof statusMessageKey>[0]))] : null,
+    values.status ? [t("leads.stage"), t(statusMessageKey(values.status as LeadStatus))] : null,
     values.owner ? [t("leads.owner"), ownerLabel ?? values.owner] : null,
     values.opportunity ? [t("leads.opportunity"), values.opportunity.replaceAll("_", " ")] : null,
     values.segment ? [t("leads.segment"), values.segment] : null,
@@ -34,14 +34,18 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
     values.quick ? [t("leads.quickView"), quickLabels[values.quick] ?? values.quick] : null,
   ].filter(Boolean) as string[][];
 
-  const fields = <div className="grid gap-4">
-    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.stage")}</span><select name="status" defaultValue={values.status ?? ""} className={controlClass}><option value="">{t("leads.allStages")}</option>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{t(statusMessageKey(status))}</option>)}</select></label>
-    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.owner")}</span><select name="owner" defaultValue={values.owner ?? ""} className={controlClass}><option value="">{t("leads.allOwners")}</option><option value="me">{t("leads.me")}</option><option value="unassigned">{t("leads.unassigned")}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.id === currentUserId ? `${user.name} (${t("leads.me").toLowerCase()})` : user.name}</option>)}</select></label>
+  const advancedFields = <>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.opportunity")}</span><select name="opportunity" defaultValue={values.opportunity ?? ""} className={controlClass}><option value="">{t("leads.allOpportunities")}</option>{SERVICE_OPPORTUNITIES.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.segment")}</span><input name="segment" defaultValue={values.segment} placeholder={t("leads.segmentPlaceholder")} className={controlClass}/></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.city")}</span><input name="city" defaultValue={values.city} placeholder={t("leads.cityPlaceholder")} className={controlClass}/></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.scoreMin")}</span><input name="scoreMin" type="number" min="0" max="100" defaultValue={values.scoreMin} placeholder="0–100" className={controlClass}/></label>
     <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.quickView")}</span><select name="quick" defaultValue={values.quick ?? ""} className={controlClass}><option value="">{t("leads.none")}</option><option value="high-score">{t("leads.highScore")}</option><option value="today">{t("leads.contactToday")}</option><option value="overdue">{t("leads.overdue")}</option><option value="no-action">{t("leads.noAction")}</option><option value="proposal">{t("leads.proposals")}</option><option value="negotiation">{t("leads.negotiation")}</option><option value="won">{t("leads.won")}</option></select></label>
+  </>;
+
+  const mobileFields = <div className="grid gap-4">
+    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.stage")}</span><select name="status" defaultValue={values.status ?? ""} className={controlClass}><option value="">{t("leads.allStages")}</option>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{t(statusMessageKey(status))}</option>)}</select></label>
+    <label><span className="mb-1.5 block text-xs font-medium text-muted">{t("leads.owner")}</span><select name="owner" defaultValue={values.owner ?? ""} className={controlClass}><option value="">{t("leads.allOwners")}</option><option value="me">{t("leads.me")}</option><option value="unassigned">{t("leads.unassigned")}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.id === currentUserId ? `${user.name} (${t("leads.me").toLowerCase()})` : user.name}</option>)}</select></label>
+    {advancedFields}
   </div>;
 
   const chipsUi = chips.length ? <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wide text-muted">{t("leads.activeFilters")}</span>{chips.map(([label, value]) => <span key={`${label}-${value}`} className="inline-flex items-center gap-1.5 rounded-full border border-default bg-[var(--panel)] px-2.5 py-1.5 text-xs"><span className="text-muted">{label}:</span>{value}</span>)}<Link href="/leads" className={`${buttonSecondaryClass} min-h-9 px-2.5 text-xs`}><X size={13}/>{t("common.clearAll")}</Link></div> : null;
@@ -54,7 +58,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
       </div>
       <button type="submit" className="sr-only">{t("common.search")}</button>
       <ModalShell open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} title={t("common.filters")} description={filtersActive ? t("leads.activeFilters") : undefined}>
-        <div className="p-4">{fields}</div>
+        <div className="p-4">{mobileFields}</div>
         <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-default bg-[var(--panel)] px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <Link href="/leads" onClick={() => setMobileFiltersOpen(false)} className={buttonGhostClass}>{t("common.clear")}</Link>
           <button type="submit" className={buttonPrimaryClass}>{t("common.apply")}</button>
@@ -72,7 +76,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
       </div>
       <details open={Boolean(values.opportunity || values.segment || values.city || values.scoreMin || values.quick)} className="group rounded-xl border border-default bg-[var(--panel)]">
         <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3.5 text-sm font-medium hover:bg-[var(--panel-2)]"><span className="flex items-center gap-2"><SlidersHorizontal size={15}/>{t("leads.moreFilters")}</span><ChevronDown size={15} className="text-muted transition-transform group-open:rotate-180"/></summary>
-        <div className="grid gap-3 border-t border-default p-3 md:grid-cols-2 xl:grid-cols-5">{fields.props.children.slice(2)}</div>
+        <div className="grid gap-3 border-t border-default p-3 md:grid-cols-2 xl:grid-cols-5">{advancedFields}</div>
       </details>
     </form>
     {chipsUi}
