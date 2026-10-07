@@ -6,10 +6,12 @@ import { DateLabel } from "@/components/date-label";
 import { LeadActions } from "@/components/lead-actions";
 import { LeadScore } from "@/components/lead-score";
 import { LeadTasksCard } from "@/components/lead-tasks-card";
+import { LeadAutomationPanel } from "@/components/lead-automation-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { DomainError } from "@/lib/domain/errors";
 import { getLead, listUsers } from "@/lib/services/leads";
 import { requireCurrentUser } from "@/lib/auth/app-auth";
+import { getAutomationBundle } from "@/lib/services/intelligence";
 
 const opportunityLabels: Record<string, string> = { WEBSITE: "Website", LANDING_PAGE: "Landing page", DIGITAL_CATALOG: "Catálogo digital", GOOGLE_BUSINESS: "Google Business", AUTOMATION: "Automação", CUSTOM_SYSTEM: "Sistema personalizado", OTHER: "Outro" };
 
@@ -17,8 +19,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   let data; try { data = await getLead(id); } catch (error) { if (error instanceof DomainError && error.status === 404) notFound(); throw error; }
   const { lead, activities, evidence, tasks } = data;
-  const users = await listUsers();
-  const currentUser = await requireCurrentUser();
+  const [users, currentUser, automation] = await Promise.all([listUsers(), requireCurrentUser(), getAutomationBundle(id)]);
 
   return <>
     <Link href="/leads" className="focus-ring mb-4 inline-flex items-center gap-1 rounded-md px-1 py-1 text-xs text-muted hover:text-[var(--accent)]"><ArrowLeft size={13}/>Voltar aos leads</Link>
