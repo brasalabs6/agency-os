@@ -22,8 +22,8 @@ Criar proposta versionada a partir de fatos, diagnóstico e qualificação.
 1. Selecione serviços ativos e escopo sustentado.
 2. Liste exclusões, premissas e dependências.
 3. Use apenas pricing aprovado; se ausente, mantenha HUMAN_REQUIRED.
-4. Renderize proposta e solicite approval com delivery target.
-5. Envie somente versão aprovada.
+4. Releia a proposta, use seu `version` como `expectedVersion` e solicite approval com delivery target registrado no lead.
+5. Envie somente a versão exata aprovada; após `PENDING_APPROVAL`/`SENT`, nunca edite a mesma row — uma mudança comercial exige nova revisão.
 
 ## Guardrails
 - Preserve sources and distinguish facts from inference.
