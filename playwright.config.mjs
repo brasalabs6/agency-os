@@ -19,11 +19,6 @@ export default {
     timeout: 120_000,
     env: {
       ...process.env,
-      DATA_DRIVER: "mock",
-      APP_AUTH_DISABLED: "false",
-      SESSION_SECRET: "ci-session-secret-ci-session-secret-123456",
-      MCP_AUTH_MODE: "token",
-      MCP_API_TOKEN: "ci-mcp-token-ci-mcp-token-123456",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },
