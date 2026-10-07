@@ -8,6 +8,28 @@ import { createApprovalRequest, getApproval } from "./communications";
 
 const repo = () => getAutomationRepository();
 
+type DeliveryTarget = { channel: "EMAIL" | "WHATSAPP" | "OTHER"; to: string };
+
+async function deliverDocument(kind: "PROPOSAL" | "CONTRACT", payload: Record<string, unknown>) {
+  const delivery=payload.delivery as DeliveryTarget | undefined;
+  if(!delivery?.to)throw new DomainError("Document send requires an approved delivery target","DELIVERY_TARGET_REQUIRED",422);
+  const url=process.env.DOCUMENT_SEND_WEBHOOK_URL;
+  if(!url){
+    if(process.env.DOCUMENT_SEND_MODE==="mock"){
+      return {provider:"mock",kind,channel:delivery.channel,to:delivery.to,status:"sent",sentAt:nowIso()};
+    }
+    throw new DomainError("Document send provider is not configured","DOCUMENT_PROVIDER_NOT_CONFIGURED",503);
+  }
+  const headers:Record<string,string>={"content-type":"application/json"};
+  if(process.env.DOCUMENT_SEND_API_TOKEN)headers.authorization="Bearer "+process.env.DOCUMENT_SEND_API_TOKEN;
+  const response=await fetch(url,{method:"POST",headers,body:JSON.stringify({kind,delivery,document:payload})});
+  const raw=await response.text();
+  if(!response.ok)throw new DomainError("Document provider rejected delivery","DOCUMENT_SEND_FAILED",502,{status:response.status,body:raw.slice(0,1000)});
+  let result:Record<string,unknown>={providerStatus:response.status,status:"sent",kind};
+  try{result={...result,...JSON.parse(raw) as Record<string,unknown>};}catch{result.raw=raw.slice(0,1000);}
+  return result;
+}
+
 export async function upsertQualification(
   leadId: string,
   input: Omit<Qualification,
@@ -149,7 +171,7 @@ export async function updateProposal(
   return updated;
 }
 
-export async function requestProposalApproval(id: string, actor: ActorContext, tool?: string) {
+export async function requestProposalApproval(id: string, actor: ActorContext, tool?: string, delivery?: DeliveryTarget) {
   const proposal = await getProposal(id);
   if (proposal.agencyFeeCents == null || !proposal.paymentTerms) {
     throw new DomainError(
@@ -165,6 +187,7 @@ export async function requestProposalApproval(id: string, actor: ActorContext, t
       proposalId: id,
       version: proposal.version,
       renderedContent: proposal.renderedContent,
+      delivery: delivery ?? null,
     },
     preview: proposal.renderedContent ?? "Proposta",
     rationale: "Enviar proposta comercial versionada.",
@@ -199,6 +222,7 @@ export async function executeApprovedProposal(
       409,
     );
   }
+  const deliveryResult = await deliverDocument("PROPOSAL", approval.payload);
   const updated = await repo().updateProposal(proposal.id, proposal.version, {
     status: "SENT",
     sentAt: nowIso(),
@@ -207,7 +231,7 @@ export async function executeApprovedProposal(
   const done = await repo().updateApproval(approval.id, approval.version, {
     status: "EXECUTED",
     executedAt: nowIso(),
-    executionResult: { proposalId: proposal.id, status: "SENT" },
+    executionResult: { proposalId: proposal.id, status: "SENT", delivery: deliveryResult },
   });
   if (!done) throwVersionConflict("Approval");
   const lead = await getLead(proposal.leadId);
@@ -223,7 +247,7 @@ export async function executeApprovedProposal(
     "proposal",
     proposal.id,
     { approvalId },
-    { status: "SENT" },
+    { status: "SENT", delivery: deliveryResult },
     proposal.leadId,
     tool,
   );
@@ -388,6 +412,7 @@ export async function requestContractApproval(
   id: string,
   actor: ActorContext,
   tool?: string,
+  delivery?: DeliveryTarget,
 ) {
   const contract = await getContract(id);
   const approval = await createApprovalRequest({
@@ -397,6 +422,7 @@ export async function requestContractApproval(
       contractId: id,
       version: contract.version,
       renderedContent: contract.renderedContent,
+      delivery: delivery ?? null,
     },
     preview: contract.renderedContent ?? "Contrato",
     rationale: "Revisão humana/jurídica obrigatória antes do envio.",
@@ -431,6 +457,7 @@ export async function executeApprovedContract(
       409,
     );
   }
+  const deliveryResult = await deliverDocument("CONTRACT", approval.payload);
   const updated = await repo().updateContract(contract.id, contract.version, {
     status: "SENT",
   });
@@ -438,7 +465,7 @@ export async function executeApprovedContract(
   const done = await repo().updateApproval(approval.id, approval.version, {
     status: "EXECUTED",
     executedAt: nowIso(),
-    executionResult: { contractId: contract.id, status: "SENT" },
+    executionResult: { contractId: contract.id, status: "SENT", delivery: deliveryResult },
   });
   if (!done) throwVersionConflict("Approval");
   await automationAudit(
