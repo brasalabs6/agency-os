@@ -93,18 +93,26 @@ export async function upsertQualification(
   input: Omit<Qualification,
     "id" | "leadId" | "version" | "createdAt" | "updatedAt" |
     "createdByType" | "createdById">,
+  expectedVersion: number | undefined,
   actor: ActorContext,
   tool?: string,
 ) {
   await getLead(leadId);
   const before = await repo().getQualification(leadId);
+  if (before && expectedVersion == null) {
+    throw new DomainError("expectedVersion is required", "EXPECTED_VERSION_REQUIRED", 422);
+  }
+  if (!before && expectedVersion != null) {
+    throwVersionConflict("Qualification");
+  }
   const item = await repo().upsertQualification({
     leadId,
     version: (before?.version ?? 0) + 1,
     ...input,
     createdByType: actor.type,
     createdById: actor.id,
-  });
+  }, expectedVersion);
+  if (!item) throwVersionConflict("Qualification");
   await automationAudit(
     actor,
     "qualification.upsert",
