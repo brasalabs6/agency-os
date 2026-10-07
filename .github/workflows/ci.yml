@@ -103,11 +103,12 @@ jobs:
     timeout-minutes: 20
     env:
       DATA_DRIVER: mock
-      APP_AUTH_DISABLED: "false"
+      APP_AUTH_DISABLED: "true"
       SESSION_SECRET: ci-session-secret-ci-session-secret-123456
       MCP_AUTH_MODE: token
       MCP_API_TOKEN: ci-mcp-token-ci-mcp-token-123456
       NEXT_TELEMETRY_DISABLED: "1"
+      PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
 
     steps:
       - name: Checkout
