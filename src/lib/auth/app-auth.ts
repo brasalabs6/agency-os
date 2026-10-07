@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DomainError } from "@/lib/domain/errors";
 import type { ActorContext } from "@/lib/domain/types";
+import { HUMAN_APP_SCOPES } from "@/lib/auth/scopes";
 import type { AuthenticatedUser } from "./types";
 import { resolveSessionToken, signOutToken } from "@/lib/services/auth";
 
@@ -38,7 +39,7 @@ export async function requireAdminUser(): Promise<AuthenticatedUser> {
 
 export async function requireAppActor(): Promise<ActorContext> {
   const user = await requireCurrentUser();
-  return { type: "USER", id: user.id, name: user.name, role: user.role, scopes: ["leads.read", "leads.write"] };
+  return { type: "USER", id: user.id, name: user.name, role: user.role, scopes: [...HUMAN_APP_SCOPES] };
 }
 
 export async function setAppSessionToken(token: string, expiresAt: string) {

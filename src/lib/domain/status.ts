@@ -67,6 +67,7 @@ export function canTransition(from: LeadStatus, to: LeadStatus): boolean {
   if (from === to) return true;
   if (from === "DO_NOT_CONTACT" || from === "INVALID") return false;
   if (["DO_NOT_CONTACT", "INVALID", "LOST", "NURTURE", "WON"].includes(to)) return true;
+  if (from === "WON" && to === "ONBOARDING") return true;
   if (from === "WON" || from === "ONBOARDING" || from === "LOST") return false;
   return true;
 }

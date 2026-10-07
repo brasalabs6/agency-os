@@ -1,0 +1,2 @@
+import { apiActor,errorResponse,ok } from "@/lib/services/http";import { markProposalResponse } from "@/lib/services/sales-automation";
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const actor=await apiActor();const{id}=await params;const body=await request.json() as {status:"ACCEPTED"|"REJECTED";notes?:string};return ok(await markProposalResponse(id,body.status,body.notes,actor));}catch(error){return errorResponse(error);}}

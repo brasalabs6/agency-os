@@ -136,7 +136,7 @@ export class MockLeadRepository implements LeadRepository {
   async addAudit(input: AddAuditInput) {
     const audit: AuditLog = {
       id: randomUUID(), actorType: input.actor.type, actorId: input.actor.id, tool: input.tool ?? null,
-      action: input.action, leadId: input.leadId ?? null, input: input.input ?? {}, result: input.result ?? {}, createdAt: new Date().toISOString(),
+      action: input.action, leadId: input.leadId ?? null, entityType: input.entityType ?? null, entityId: input.entityId ?? null, input: input.input ?? {}, result: input.result ?? {}, createdAt: new Date().toISOString(),
     };
     this.audits.unshift(audit);
     return clone(audit);

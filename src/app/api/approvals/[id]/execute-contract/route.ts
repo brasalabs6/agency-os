@@ -1,0 +1,2 @@
+import { apiActor,errorResponse,ok } from "@/lib/services/http";import { executeApprovedContract } from "@/lib/services/sales-automation";
+export async function POST(_r:Request,{params}:{params:Promise<{id:string}>}){try{const actor=await apiActor();const{id}=await params;return ok(await executeApprovedContract(id,actor));}catch(error){return errorResponse(error);}}

@@ -35,6 +35,8 @@ export interface AddAuditInput {
   tool?: string | null;
   action: string;
   leadId?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
   input?: Record<string, unknown>;
   result?: Record<string, unknown>;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { asDomainError, DomainError } from "@/lib/domain/errors";
 import { getCurrentUser } from "@/lib/auth/app-auth";
 import type { ActorContext } from "@/lib/domain/types";
+import { HUMAN_APP_SCOPES } from "@/lib/auth/scopes";
 
 export function ok(data: unknown, init?: ResponseInit) { return NextResponse.json(data, { status: 200, ...init }); }
 export function created(data: unknown) { return NextResponse.json(data, { status: 201 }); }
@@ -25,5 +26,5 @@ export async function apiUser() {
 
 export async function apiActor(): Promise<ActorContext> {
   const user = await apiUser();
-  return { type: "USER", id: user.id, name: user.name, role: user.role, scopes: ["leads.read", "leads.write"] };
+  return { type: "USER", id: user.id, name: user.name, role: user.role, scopes: [...HUMAN_APP_SCOPES] };
 }
