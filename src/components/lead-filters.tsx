@@ -51,7 +51,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
   const chipsUi = chips.length ? <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-medium uppercase tracking-wide text-muted">{t("leads.activeFilters")}</span>{chips.map(([label, value]) => <span key={`${label}-${value}`} className="inline-flex items-center gap-1.5 rounded-full border border-default bg-[var(--panel)] px-2.5 py-1.5 text-xs"><span className="text-muted">{label}:</span>{value}</span>)}<Link href="/leads" className={`${buttonSecondaryClass} min-h-9 px-2.5 text-xs`}><X size={13}/>{t("common.clearAll")}</Link></div> : null;
 
   return <div className="mb-5 space-y-3">
-    <form method="get" className="space-y-3 lg:hidden">
+    <form data-testid="mobile-lead-filters" method="get" className="space-y-3 lg:hidden">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         <label className="relative"><span className="sr-only">{t("common.search")}</span><Search size={16} className="pointer-events-none absolute left-3 top-3.5 text-muted"/><input name="q" defaultValue={values.q} placeholder={t("leads.searchPlaceholder")} className={`${controlClass} pl-9`}/></label>
         <button type="button" onClick={() => setMobileFiltersOpen(true)} className={buttonSecondaryClass}><SlidersHorizontal size={16}/><span>{t("common.filters")}</span>{activeCount ? <span className="rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-xs font-semibold text-[var(--accent)]">{activeCount}</span> : null}</button>
@@ -66,7 +66,7 @@ export function LeadFilters({ values, users, currentUserId }: { values: Record<s
       </ModalShell>
     </form>
 
-    <form method="get" className="hidden space-y-3 lg:block">
+    <form data-testid="desktop-lead-filters" method="get" className="hidden space-y-3 lg:block">
       <div className="grid gap-2 xl:grid-cols-[minmax(280px,1fr)_180px_190px_auto_auto]">
         <label className="relative"><span className="sr-only">{t("common.search")}</span><Search size={16} className="pointer-events-none absolute left-3 top-3.5 text-muted"/><input name="q" defaultValue={values.q} placeholder={t("leads.searchPlaceholder")} className={`${controlClass} pl-9`}/></label>
         <select aria-label={t("leads.stage")} name="status" defaultValue={values.status ?? ""} className={controlClass}><option value="">{t("leads.allStages")}</option>{LEAD_STATUSES.map((status) => <option key={status} value={status}>{t(statusMessageKey(status))}</option>)}</select>
