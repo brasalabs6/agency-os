@@ -235,3 +235,9 @@ export const proposalResponseSchema = versionCommandSchema.extend({
   status: z.enum(["ACCEPTED", "REJECTED"]),
   notes: z.string().max(5000).optional(),
 });
+
+
+export const signatureWebhookSchema = contractSignatureSchema.extend({
+  contractId: z.string().uuid(),
+  externalSignatureId: z.string().min(1).max(500),
+});
