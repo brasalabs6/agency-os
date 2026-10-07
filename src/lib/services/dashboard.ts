@@ -52,6 +52,7 @@ async function getRepositoryDashboardSummary(): Promise<DashboardSummary> {
 
   const now = new Date();
   const { start, end } = dayRangeInTimeZone(now);
+  const activeStatusSet = new Set<Lead["status"]>(ACTIVE_STATUSES);
   const countsByStatus: DashboardSummary["countsByStatus"] = {};
   for (const status of LEAD_STATUSES) countsByStatus[status] = 0;
   for (const lead of leadResult.items) countsByStatus[lead.status] = (countsByStatus[lead.status] ?? 0) + 1;
@@ -63,7 +64,7 @@ async function getRepositoryDashboardSummary(): Promise<DashboardSummary> {
 
   const needsAttention = leadResult.items
     .filter((lead) => {
-      if (!ACTIVE_STATUSES.includes(lead.status)) return false;
+      if (!activeStatusSet.has(lead.status)) return false;
       const due = lead.nextActionAt ? new Date(lead.nextActionAt) : null;
       const dueOrOverdue = Boolean(due && due <= end);
       const noNextAction = !lead.nextAction;
