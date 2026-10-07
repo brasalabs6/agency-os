@@ -89,7 +89,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Authen
   ];
 
   return <div className="min-h-dvh lg:flex">
-    <aside className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-default bg-[var(--panel)] transition-[width] duration-200 lg:flex ${collapsed ? "w-[72px]" : "w-[248px]"}`}>
+    <aside data-testid="desktop-sidebar" className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-default bg-[var(--panel)] transition-[width] duration-200 lg:flex ${collapsed ? "w-[72px]" : "w-[248px]"}`}>
       <div className={`flex h-16 items-center border-b border-default ${collapsed ? "justify-center px-2" : "justify-between px-3"}`}>
         <Link href="/" className={`focus-ring flex min-w-0 items-center rounded-lg ${collapsed ? "justify-center" : "gap-2.5"}`} title={collapsed ? "AgencyOS" : undefined}>
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--text)] text-[var(--panel)]"><Activity size={16}/></span>
@@ -114,7 +114,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Authen
     </aside>
 
     <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-default bg-[color:var(--bg)]/92 px-2.5 backdrop-blur lg:hidden">
+      <header data-testid="mobile-header" className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-default bg-[color:var(--bg)]/92 px-2.5 backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-1.5"><button onClick={() => setMobileOpen(true)} className="focus-ring grid h-11 w-11 shrink-0 place-items-center rounded-lg hover:bg-[var(--panel-2)]" aria-label={t("nav.openMenu")}><Menu size={20}/></button><Link href="/" className="flex min-w-0 items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[var(--text)] text-[var(--panel)]"><Activity size={14}/></span><span className="truncate text-sm font-semibold">AgencyOS</span></Link></div>
         <div className="flex items-center gap-1"><LanguageToggle compact/><ThemeToggle/></div>
       </header>
@@ -123,7 +123,7 @@ export function AppShell({ children, user }: { children: ReactNode; user: Authen
 
     {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="presentation">
       <button className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} aria-label={t("nav.closeMenu")}/>
-      <aside ref={drawerRef} role="dialog" aria-modal="true" aria-label="AgencyOS" className="relative flex h-full w-[min(92vw,360px)] flex-col border-r border-default bg-[var(--panel)] shadow-2xl">
+      <aside ref={drawerRef} data-testid="mobile-drawer" role="dialog" aria-modal="true" aria-label="AgencyOS" className="relative flex h-full w-[min(92vw,360px)] flex-col border-r border-default bg-[var(--panel)] shadow-2xl">
         <div className="flex h-14 items-center justify-between border-b border-default px-3"><Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--text)] text-[var(--panel)]"><Activity size={16}/></span><span><span className="block text-sm font-semibold">AgencyOS</span><span className="block text-[10px] uppercase tracking-[0.14em] text-muted">CRM</span></span></Link><button onClick={() => setMobileOpen(false)} className="focus-ring grid h-11 w-11 place-items-center rounded-lg text-muted hover:bg-[var(--panel-2)]" aria-label={t("nav.closeMenu")}><X size={18}/></button></div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">{primary.map((item) => <NavItem key={item.href} href={item.href} label={item.text} icon={item.icon} pathname={pathname} onNavigate={() => setMobileOpen(false)}/>)}</nav>
         <div className="space-y-1 border-t border-default p-3">{settings.map((item) => <NavItem key={item.href} href={item.href} label={item.text} icon={item.icon} pathname={pathname} onNavigate={() => setMobileOpen(false)}/>)}</div>
