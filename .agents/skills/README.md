@@ -66,3 +66,49 @@ Minimum handoff:
 - next executable action.
 
 Never treat Todo lists, previous chat summaries or memory as a replacement for current repository/infrastructure state.
+
+
+## Commercial automation skills
+
+| Skill | Use for |
+| --- | --- |
+| `lead-discovery` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `business-enrichment` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `digital-presence-diagnostic` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `lead-scoring` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `sales-prioritization` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `outreach-copilot` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `whatsapp-conversation-analysis` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `conversation-to-crm` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `lead-qualification` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `whatsapp-assisted-outreach` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `proposal-generation` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `negotiation-copilot` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `contract-generation` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `contract-obligations` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `client-onboarding` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `follow-up-planner` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `pipeline-review` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+| `sales-learning` | AI-assisted commercial workflow with explicit autonomy/approval guards |
+
+Commercial workflow composition:
+
+```text
+lead-discovery
+→ business-enrichment
+→ digital-presence-diagnostic
+→ lead-scoring
+→ sales-prioritization
+→ outreach-copilot / whatsapp-assisted-outreach
+→ lead-qualification
+→ proposal-generation
+→ negotiation-copilot
+→ contract-generation
+→ contract-obligations
+→ client-onboarding
+→ follow-up-planner / pipeline-review
+→ sales-learning
+```
+
+Read-only conversation understanding uses `whatsapp-conversation-analysis`; CRM projection uses `conversation-to-crm`.
+External actions are A2 and must pass through human `ApprovalRequest`; no agent skill may approve its own action.

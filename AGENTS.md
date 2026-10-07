@@ -128,3 +128,19 @@ Use the smallest set that covers the task:
 - `mcp-user-identity`
 
 See `.agents/skills/README.md` for composition patterns.
+
+
+### Commercial automation skill set
+
+For AI-assisted sales work, compose the commercial skills under `.agents/skills/` rather than inventing ad-hoc workflows. The canonical set is:
+
+`lead-discovery`, `business-enrichment`, `digital-presence-diagnostic`, `lead-scoring`, `sales-prioritization`, `outreach-copilot`, `whatsapp-conversation-analysis`, `conversation-to-crm`, `lead-qualification`, `whatsapp-assisted-outreach`, `proposal-generation`, `negotiation-copilot`, `contract-generation`, `contract-obligations`, `client-onboarding`, `follow-up-planner`, `pipeline-review`, `sales-learning`.
+
+Commercial agents must additionally preserve these invariants:
+
+- WhatsApp/history ingestion is read-only analysis by default.
+- There is no raw-send MCP tool; external send executes only an already human-approved payload.
+- Proposal price/payment terms may remain `HUMAN_REQUIRED`; never fabricate commercial terms.
+- Contract generation is tied to an exact proposal/template version and requires human/legal review before send.
+- Client projects/obligations may be generated only from a `SIGNED` contract.
+- Persist `AiRun` summaries and artifact references, never model chain-of-thought.
