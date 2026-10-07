@@ -14,6 +14,7 @@ push / pull request
         v
 GitHub Actions — Quality Gate
   npm ci
+  dependency audit
   migration sequence validation
   lint
   typecheck
@@ -26,8 +27,14 @@ GitHub Actions — Quality Gate
        PR                        main
         |                         |
         v                         v
-Vercel Preview            Vercel production waits
-status must pass           for Quality Gate = green
+Mobile Browser Gate        Vercel production waits
+  public ubuntu runner      for Quality Gate = green
+  Chromium / Playwright
+  360, 390, 412, 768 px
+  PT/EN preference
+        |
+        v
+Vercel Preview
                                   |
                                   v
                           Vercel build/deploy
@@ -60,7 +67,9 @@ It runs:
 - `npm run build`
 - a local smoke test against the built Next.js artifact
 
-On pull requests it also waits for Vercel's **Vercel** commit status, producing the **Vercel Preview** check.
+On pull requests, a separate **Mobile Browser Gate** runs on a GitHub-hosted public `ubuntu-latest` runner after the Quality Gate. It installs a pinned Playwright runner ephemerally (without changing the application lockfile), installs Chromium, starts AgencyOS with the mock data driver, signs in with the demo admin account, and validates the core routes at 360×800, 390×844, 412×915 and 768×1024. It checks that the intended mobile variants are rendered, that the document does not gain horizontal overflow, and that the PT-BR/English language preference persists.
+
+After both gates pass, CI waits for Vercel's **Vercel** commit status, producing the **Vercel Preview** check.
 
 ### Production Smoke
 
@@ -114,6 +123,7 @@ Recommended rules for `main`:
 
 - require a pull request before merging;
 - require **Quality Gate**;
+- require **Mobile Browser Gate**;
 - require **Vercel Preview** for PRs;
 - require the branch to be up to date before merging;
 - block force pushes;
@@ -125,6 +135,7 @@ The GitHub connector used to implement this pipeline does not have repository ad
 ## Failure behavior
 
 - Production dependency high/critical vulnerability, lint warning/error, type/test/build failure: **Quality Gate** fails and Vercel production is ignored.
+- Mobile layout overflow, wrong responsive variant, or PT/EN persistence regression: **Mobile Browser Gate** fails on the PR.
 - Vercel Preview failure: **Vercel Preview** fails on the PR.
 - Vercel production build failure: the previous production alias remains live.
 - Wrong production SHA: **Production Smoke** fails.
