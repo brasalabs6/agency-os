@@ -46,8 +46,9 @@ export async function createChannelConnection(
   const item = await repo().createChannelConnection({
     provider: "WHATSAPP",
     accountLabel: input.accountLabel,
-    status: "CONNECTED",
-    capabilities: input.capabilities ?? ["READ"],
+    // Registration alone is not proof of a live provider session.
+    status: "DISCONNECTED",
+    capabilities: ["READ"],
     ownerUserId: input.ownerUserId ?? actor.id,
     externalAccountId: input.externalAccountId ?? null,
   });
