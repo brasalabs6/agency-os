@@ -8,7 +8,7 @@ import { automationAudit, nowIso } from "./automation-utils";
 
 const repo = () => getAutomationRepository();
 
-type NewObligation = Omit<ProjectObligation, "id" | "createdAt" | "updatedAt" | "projectId">;
+type NewObligation = Omit<ProjectObligation, "id" | "version" | "createdAt" | "updatedAt" | "projectId">;
 
 function expectedObligations(contract: Awaited<ReturnType<typeof getContract>>): NewObligation[] {
   const items: NewObligation[] = [];
@@ -168,12 +168,16 @@ export async function updateProjectObligation(
     dueAt?: string | null;
     description?: string | null;
     metadata?: Record<string, unknown>;
+    expectedVersion: number;
   },
   actor: ActorContext,
   tool?: string,
 ) {
-  const updated = await repo().updateObligation(id, changes);
-  if (!updated) throw new DomainError("Obligation not found", "OBLIGATION_NOT_FOUND", 404);
+  const { expectedVersion, ...patch } = changes;
+  const updated = await repo().updateObligation(id, expectedVersion, patch);
+  if (!updated) {
+    throw new DomainError("Obligation not found or version changed; refresh before updating", "VERSION_CONFLICT", 409);
+  }
   await automationAudit(
     actor,
     "project_obligation.update",
