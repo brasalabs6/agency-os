@@ -30,6 +30,15 @@ function validateScore(input: Pick<ScoreAssessment,
 }
 
 export async function getAutomationBundle(leadId: string): Promise<AutomationBundle> {
+  // Safe rollout: the lead detail must keep working before migration 0008.
+  if (process.env.AI_COMMERCIAL_AUTOMATION_ENABLED !== "true" && process.env.DATA_DRIVER !== "mock") {
+    return {
+      businessProfile: null, diagnostics: [], scores: [], aiRuns: [],
+      conversations: [], qualification: null, proposals: [],
+      contracts: [], approvals: [], projects: [],
+    };
+  }
+
   await getLead(leadId);
   const [profiles, diagnostics, scores, aiRuns, conversations, qualification, proposals, contracts, approvals, projects] =
     await Promise.all([
