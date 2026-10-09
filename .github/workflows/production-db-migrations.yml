@@ -1,0 +1,106 @@
+name: Production Database Migrations
+
+# SQL is first tested by CI on temporary PostgreSQL. Production is a separate
+# phase requiring a confirmed recovery point and an approved environment.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Read-only plan or guarded apply"
+        required: true
+        type: choice
+        options: [plan, apply]
+        default: plan
+      backup_reference:
+        description: "External recoverable backup reference, required for apply"
+        required: false
+        type: string
+      backup_verified_at:
+        description: "ISO UTC timestamp, verified within 24 hours"
+        required: false
+        type: string
+      adopt_existing_0008:
+        description: "Only when 0008 was already applied in Supabase"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agencyos-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  production-migration:
+    name: Verify/apply production DB migrations
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Configure required reviewers on this environment before enabling apply!
+    environment: production-db
+    env:
+      DATABASE_URL: ${{ secrets.AGENCYOS_MIGRATION_DATABASE_URL }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (vars.AGENCYOS_MIGRATIONS_AUTO_APPLY == 'true' && 'apply' || 'plan') }}
+      PRODUCTION_MIGRATION_APPROVED: ${{ (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply') || (github.event_name == 'workflow_run' && vars.AGENCYOS_MIGRATIONS_AUTO_APPLY == 'true') }}
+      PRODUCTION_BACKUP_REFERENCE: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_reference || vars.AGENCYOS_BACKUP_REFERENCE }}
+      PRODUCTION_BACKUP_VERIFIED_AT: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_verified_at || vars.AGENCYOS_BACKUP_VERIFIED_AT }}
+      ADOPT_EXISTING_MIGRATION_0008: ${{ github.event_name == 'workflow_dispatch' && inputs.adopt_existing_0008 && 'true' || vars.AGENCYOS_ADOPT_0008 }}
+    steps:
+      - name: Checkout exact reviewed commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Confirm checked-out SHA is current protected main
+        run: |
+          set -euo pipefail
+          checked_out="$(git rev-parse HEAD)"
+          current_main="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [[ "$checked_out" != "$current_main" ]]; then
+            echo "Refusing to run migrations from an outdated commit." >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Test migration runner
+        run: node --test scripts/production-migrations.test.mjs
+
+      - name: Run plan or guarded apply
+        run: |
+          set -euo pipefail
+          if [[ -z "$DATABASE_URL" ]]; then
+            if [[ "$MODE" == "apply" ]]; then
+              echo "Missing AGENCYOS_MIGRATION_DATABASE_URL secret." >&2
+              exit 1
+            fi
+            echo "::warning::Configure production-db secret to enable remote planning."
+            exit 0
+          fi
+          node scripts/production-migrations.mjs "$MODE"
+
+      - name: Explain activation gate
+        if: always()
+        run: |
+          echo "Database migrations do NOT enable application feature flags."
+          echo "Verify schema and deploy separately before enabling the AI module."
