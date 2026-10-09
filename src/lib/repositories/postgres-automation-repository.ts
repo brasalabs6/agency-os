@@ -120,7 +120,14 @@ export class PostgresAutomationRepository implements AutomationRepository {
   async getConversationByExternal(connectionId:string,externalId:string){const [r]=await getDb().select().from(conversations).where(and(eq(conversations.connectionId,connectionId),eq(conversations.externalId,externalId))).limit(1);return r?mapConversation(r):null;}
   async upsertConversation(input:Omit<Conversation,"id"|"createdAt"|"updatedAt">){
     const [r]=await getDb().insert(conversations).values({connectionId:input.connectionId,externalId:input.externalId,leadId:input.leadId,contactAddress:input.contactAddress,contactDisplayName:input.contactDisplayName,lastMessageAt:input.lastMessageAt?new Date(input.lastMessageAt):null,optOutDetected:input.optOutDetected})
-      .onConflictDoUpdate({target:[conversations.connectionId,conversations.externalId],set:{leadId:input.leadId,contactAddress:input.contactAddress,contactDisplayName:input.contactDisplayName,lastMessageAt:input.lastMessageAt?new Date(input.lastMessageAt):null,optOutDetected:input.optOutDetected,updatedAt:new Date()}}).returning();return mapConversation(r);
+      .onConflictDoUpdate({target:[conversations.connectionId,conversations.externalId],set:{
+        leadId:sql`COALESCE(${conversations.leadId}, EXCLUDED.lead_id)`,
+        contactAddress:input.contactAddress,
+        contactDisplayName:sql`COALESCE(EXCLUDED.contact_display_name, ${conversations.contactDisplayName})`,
+        lastMessageAt:sql`GREATEST(${conversations.lastMessageAt}, EXCLUDED.last_message_at)`,
+        optOutDetected:sql`${conversations.optOutDetected} OR EXCLUDED.opt_out_detected`,
+        updatedAt:new Date(),
+      }}).returning();return mapConversation(r);
   }
   async linkConversation(id:string,leadId:string|null,optOutDetected?:boolean){
     const [r]=await getDb().update(conversations).set({leadId,optOutDetected,updatedAt:new Date()}).where(eq(conversations.id,id)).returning();return r?mapConversation(r):null;
