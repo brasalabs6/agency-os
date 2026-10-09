@@ -6,10 +6,12 @@ import { DateLabel } from "@/components/date-label";
 import { LeadActions } from "@/components/lead-actions";
 import { LeadScore } from "@/components/lead-score";
 import { LeadTasksCard } from "@/components/lead-tasks-card";
+import { LeadAutomationPanel } from "@/components/lead-automation-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { DomainError } from "@/lib/domain/errors";
 import { getLead, listUsers } from "@/lib/services/leads";
 import { requireCurrentUser } from "@/lib/auth/app-auth";
+import { getAutomationBundle } from "@/lib/services/intelligence";
 
 const opportunityLabels: Record<string, string> = { WEBSITE: "Website", LANDING_PAGE: "Landing page", DIGITAL_CATALOG: "Catálogo digital", GOOGLE_BUSINESS: "Google Business", AUTOMATION: "Automação", CUSTOM_SYSTEM: "Sistema personalizado", OTHER: "Outro" };
 
@@ -17,8 +19,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   let data; try { data = await getLead(id); } catch (error) { if (error instanceof DomainError && error.status === 404) notFound(); throw error; }
   const { lead, activities, evidence, tasks } = data;
-  const users = await listUsers();
-  const currentUser = await requireCurrentUser();
+  const [users, currentUser, automation] = await Promise.all([listUsers(), requireCurrentUser(), getAutomationBundle(id)]);
 
   return <>
     <Link href="/leads" className="focus-ring mb-4 inline-flex items-center gap-1 rounded-md px-1 py-1 text-xs text-muted hover:text-[var(--accent)]"><ArrowLeft size={13}/>Voltar aos leads</Link>
@@ -42,6 +43,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <section className="surface-flat rounded-xl p-4"><h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Presença digital</h2><div className="mt-3 space-y-2 text-sm">{lead.website ? <WebRow icon={<Globe2 size={14}/>} href={lead.website} label="Website"/> : <span className="text-xs text-amber-700 dark:text-amber-300">Site próprio não identificado</span>}{lead.googleMapsUrl ? <WebRow icon={<MapPin size={14}/>} href={lead.googleMapsUrl} label="Perfil no Google"/> : null}{lead.instagramUrl ? <WebRow icon={<Instagram size={14}/>} href={lead.instagramUrl} label="Instagram"/> : null}</div></section>
         <section className="surface-flat rounded-xl p-4"><h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Evidências</h2><div className="mt-3 space-y-3">{evidence.map((item) => <div key={item.id} className="rounded-lg bg-[var(--panel-2)] p-3"><div className="text-[10px] uppercase text-muted">{item.claim}</div><div className="mt-1 text-xs font-medium">{item.value}</div><a href={item.sourceUrl} target="_blank" rel="noreferrer" className="mt-2 flex min-w-0 items-center gap-1 text-[10px] text-muted hover:text-[var(--accent)]"><ExternalLink size={10} className="shrink-0"/><span className="truncate">{item.sourceUrl}</span></a></div>)}{evidence.length === 0 ? <p className="text-xs text-muted">Nenhuma evidência registrada.</p> : null}</div></section>
       </aside>
+    </div>
+
+    <div className="mt-5">
+      <LeadAutomationPanel leadId={lead.id} data={automation}/>
     </div>
   </>;
 }

@@ -94,10 +94,137 @@ jobs:
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/login | grep -q "AgencyOS Leads"
           curl --fail --silent --show-error --location --max-time 5 http://127.0.0.1:3000/ | grep -q "AgencyOS Leads"
 
+  postgres-migrations:
+    name: PostgreSQL 16 migration and privilege smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agencyos
+          POSTGRES_USER: agencyos
+          POSTGRES_PASSWORD: agencyos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agencyos -d agencyos"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: agencyos
+      PGPASSWORD: agencyos
+      PGDATABASE: agencyos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Install psql if needed
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Apply all SQL migrations to real PostgreSQL
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          SQL
+          for file in drizzle/[0-9][0-9][0-9][0-9]_*.sql; do
+            if [[ "$file" == *"/0008_"* ]]; then
+              # A pre-existing narrowly scoped credential must remain unchanged.
+              psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO public.users (id,name,email,role)
+          VALUES ('00000000-0000-4000-8000-000000000001','Migration Tester','test@example.test','ADMIN');
+          INSERT INTO public.mcp_credentials
+            (user_id,name,token_hash,token_prefix,scopes)
+          VALUES
+            ('00000000-0000-4000-8000-000000000001','pre-migration-credential','migration-test-token-hash','mcp-test','["leads.read"]'::jsonb);
+          SQL
+            fi
+            echo "Applying $file"
+            psql -v ON_ERROR_STOP=1 -f "$file" >/dev/null
+          done
+
+      - name: Verify grants, version constraints and safe credential scopes
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          DO $verify$
+          DECLARE existing_scopes jsonb;
+          BEGIN
+            SELECT scopes INTO existing_scopes
+              FROM public.mcp_credentials WHERE name='pre-migration-credential';
+            IF existing_scopes IS DISTINCT FROM '["leads.read"]'::jsonb THEN
+              RAISE EXCEPTION 'MCP scopes changed unexpectedly: %', existing_scopes;
+            END IF;
+
+            IF (SELECT count(*) FROM pg_tables
+                WHERE schemaname='public' AND tablename IN
+                  ('business_profiles','diagnostics','score_assessments','ai_runs',
+                  'prospecting_runs','channel_connections','conversations','channel_messages',
+                  'approval_requests','qualifications','proposals','contracts','client_projects',
+                  'project_obligations')) <> 14 THEN
+              RAISE EXCEPTION 'Expected 14 automation tables';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+              WHERE n.nspname='public'
+                AND c.relname IN ('business_profiles','diagnostics','approval_requests',
+                    'qualifications','contracts','project_obligations')
+                AND NOT c.relrowsecurity
+            ) THEN
+              RAISE EXCEPTION 'Automation tables missing RLS';
+            END IF;
+
+            IF has_table_privilege('anon','public.contracts','SELECT') OR
+               has_table_privilege('authenticated','public.contracts','SELECT') THEN
+              RAISE EXCEPTION 'Data API principals unexpectedly can read contracts';
+            END IF;
+
+            IF NOT EXISTS(SELECT 1 FROM pg_indexes
+              WHERE schemaname='public' AND indexname='qualifications_lead_uidx')
+            OR NOT EXISTS(SELECT 1 FROM pg_indexes
+              WHERE schemaname='public' AND indexname='project_obligations_project_source_uidx') THEN
+              RAISE EXCEPTION 'Missing required uniqueness constraints';
+            END IF;
+          END $verify$;
+          SQL
+
+      - name: Smoke actual CRUD on newly migrated tables
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO public.leads (id,name)
+          VALUES ('00000000-0000-4000-8000-000000000002','PostgreSQL CI Lead');
+          INSERT INTO public.business_profiles
+            (lead_id,created_by_type,created_by_id)
+          VALUES ('00000000-0000-4000-8000-000000000002','SYSTEM','migration-smoke');
+          INSERT INTO public.diagnostics
+            (lead_id,generated_by_type,generated_by_id)
+          VALUES ('00000000-0000-4000-8000-000000000002','SYSTEM','migration-smoke');
+          DO $verify$
+          BEGIN
+            IF (SELECT count(*) FROM public.business_profiles WHERE lead_id='00000000-0000-4000-8000-000000000002') <> 1
+              OR (SELECT count(*) FROM public.diagnostics WHERE lead_id='00000000-0000-4000-8000-000000000002') <> 1 THEN
+              RAISE EXCEPTION 'Automation CRUD smoke failed';
+            END IF;
+          END $verify$;
+          SQL
+
   preview-deployment:
     name: Vercel Preview
     if: github.event_name == 'pull_request'
-    needs: quality-gate
+    needs: [quality-gate, postgres-migrations]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:

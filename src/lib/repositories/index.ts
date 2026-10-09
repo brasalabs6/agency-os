@@ -1,3 +1,4 @@
+import { DomainError } from "@/lib/domain/errors";
 import type { LeadRepository } from "./lead-repository";
 import type { TaskRepository } from "./task-repository";
 import { mockLeadRepository } from "./mock-lead-repository";
@@ -10,6 +11,9 @@ import { postgresAuthRepository } from "./postgres-auth-repository";
 import type { McpCredentialRepository } from "./mcp-credential-repository";
 import { mockMcpCredentialRepository } from "./mock-mcp-credential-repository";
 import { postgresMcpCredentialRepository } from "./postgres-mcp-credential-repository";
+import type { AutomationRepository } from "./automation-repository";
+import { mockAutomationRepository } from "./mock-automation-repository";
+import { postgresAutomationRepository } from "./postgres-automation-repository";
 
 function isPostgresDriver(): boolean {
   const driver = process.env.DATA_DRIVER;
@@ -32,4 +36,15 @@ export function getAuthRepository(): AuthRepository {
 
 export function getMcpCredentialRepository(): McpCredentialRepository {
   return isPostgresDriver() ? postgresMcpCredentialRepository : mockMcpCredentialRepository;
+}
+
+export function getAutomationRepository(): AutomationRepository {
+  if (isPostgresDriver() && process.env.AI_COMMERCIAL_AUTOMATION_ENABLED !== "true") {
+    throw new DomainError(
+      "AI commercial automation is disabled until migration 0008 is applied",
+      "AI_COMMERCIAL_AUTOMATION_DISABLED",
+      503,
+    );
+  }
+  return isPostgresDriver() ? postgresAutomationRepository : mockAutomationRepository;
 }

@@ -19,6 +19,9 @@ import {
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { PIPELINE_GROUPS } from "@/lib/domain/status";
 import { cancelTask, completeTask, createTask, getTask, listCalendar, listTasks, reorderTasks, rescheduleTask, updateTask } from "@/lib/services/tasks";
+import { registerIntelligenceTools } from "./intelligence-tools";
+import { registerCommunicationTools } from "./communication-tools";
+import { registerSalesAutomationTools } from "./sales-automation-tools";
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -261,6 +264,12 @@ export function buildMcpServer(actor: ActorContext) {
     if (mine) filters.ownerId = principalUserId(actor);
     return textResult(await listCalendar(filters));
   });
+
+  if (process.env.AI_COMMERCIAL_AUTOMATION_ENABLED === "true" || process.env.DATA_DRIVER === "mock") {
+    registerIntelligenceTools(server, actor);
+    registerCommunicationTools(server, actor);
+    registerSalesAutomationTools(server, actor);
+  }
 
   return server;
 }
