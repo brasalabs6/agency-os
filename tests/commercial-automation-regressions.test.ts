@@ -211,6 +211,44 @@ describe("commercial automation regressions", () => {
     )).rejects.toMatchObject({ code: "PROPOSAL_NOT_EDITABLE", status: 409 });
   });
 
+  it("does not regress an already-WON lead after sending a new approved proposal", async () => {
+    const lead = await createLead({
+      name: "Won upsell " + randomUUID(),
+      status: "WON",
+      email: "client@example.test",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
+    const proposal = await createProposal(lead.id, {
+      diagnosticId: null,
+      qualificationId: null,
+      services: ["WEBSITE"],
+      scope: ["Nova landing page"],
+      exclusions: [],
+      assumptions: [],
+      clientDependencies: [],
+      milestones: [],
+      agencyFeeCents: 100000,
+      currency: "BRL",
+      externalCosts: [],
+      paymentTerms: "À vista",
+      validityUntil: null,
+    }, agent, "test");
+    const requested = await requestProposalApproval(
+      proposal.id,
+      proposal.version,
+      agent,
+      "test",
+      { channel: "EMAIL", to: "client@example.test" },
+    );
+    const approved = await approveRequest(requested.approval.id, {
+      expectedVersion: requested.approval.version,
+    }, admin);
+    const sent = await executeApprovedProposal(approved.id, agent, "test");
+    expect(sent.status).toBe("SENT");
+    expect((await getLead(lead.id)).lead.status).toBe("WON");
+    expect((await getApproval(approved.id)).status).toBe("EXECUTED");
+  });
+
   it("binds contract to the exact accepted proposal snapshot and enforces signature state machine", async () => {
     const { lead, proposal } = await makeAcceptedProposal();
     const contract = await createContractFromProposal(proposal.id, {
