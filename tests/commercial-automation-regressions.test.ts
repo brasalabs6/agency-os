@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ActorContext } from "@/lib/domain/types";
 import { getAutomationRepository } from "@/lib/repositories";
-import { createLead, getLead } from "@/lib/services/leads";
+import { createLead, getLead, moveLeadStage } from "@/lib/services/leads";
 import {
   approveRequest,
   createApprovalRequest,
@@ -343,6 +343,38 @@ describe("commercial automation regressions", () => {
       messageId: "mock_" + approved.id,
       idempotencyKey: approved.id,
     });
+  });
+
+  it("blocks stale-lease recovery when the lead opted out after the first claim", async () => {
+    process.env.APPROVAL_EXECUTION_LEASE_SECONDS = "0";
+    const lead = await createLead({
+      name: "DNC lease recovery " + randomUUID(),
+      status: "READY_TO_CONTACT",
+      whatsapp: "+5561655555555",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
+    const pending = await createApprovalRequest({
+      leadId: lead.id,
+      actionType: "WHATSAPP_SEND",
+      payload: { to: "+5561655555555", text: "Não enviar após opt-out" },
+      preview: "Não enviar após opt-out",
+    }, agent);
+    const approved = await approveRequest(pending.id, {
+      expectedVersion: pending.version,
+    }, admin);
+    const executing = await getAutomationRepository().updateApproval(approved.id, approved.version, {
+      status: "EXECUTING",
+      executionResult: {
+        idempotencyKey: approved.id,
+        startedAt: "2000-01-01T00:00:00.000Z",
+      },
+    });
+    expect(executing?.status).toBe("EXECUTING");
+    await moveLeadStage(lead.id, "DO_NOT_CONTACT", admin, { reason: "Opt out" });
+    await expect(executeApprovedWhatsapp(approved.id, agent, "test"))
+      .rejects.toMatchObject({ code: "DO_NOT_CONTACT", status: 403 });
+    const state = await getApproval(approved.id);
+    expect(state.status).toBe("EXECUTING");
   });
 
   it("preserves conversation binding and makes opt-out monotonic when ingest omits leadId", async () => {
