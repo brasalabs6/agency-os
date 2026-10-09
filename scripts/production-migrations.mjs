@@ -148,7 +148,7 @@ export async function run() {
   const migrations = loadMigrations();
   if (!migrations.length) throw new Error("No 0008+ SQL migrations found");
   const sql = postgres(process.env.DATABASE_URL, {
-    max: 1, ssl: "require", prepare: false, connect_timeout: 15,
+    max: 1, ssl: process.env.MIGRATION_DB_SSL === "disable" ? false : "require", prepare: false, connect_timeout: 15,
   });
   try {
     const state = await probe(sql);
