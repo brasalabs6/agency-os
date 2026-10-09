@@ -491,33 +491,7 @@ export async function claimApprovalForExecution(
   if (approval.status === "EXECUTED") {
     return { approval, alreadyExecuted: true as const };
   }
-  if (approval.status === "EXECUTING") {
-    const startedAt = typeof approval.executionResult.startedAt === "string"
-      ? new Date(approval.executionResult.startedAt).getTime()
-      : 0;
-    const leaseSeconds = Number(process.env.APPROVAL_EXECUTION_LEASE_SECONDS ?? "300");
-    const leaseMs = Number.isFinite(leaseSeconds) && leaseSeconds >= 0 ? leaseSeconds * 1000 : 300000;
-    if (startedAt && Date.now() - startedAt < leaseMs) {
-      throw new DomainError(
-        "Approval execution is already in progress",
-        "APPROVAL_EXECUTION_IN_PROGRESS",
-        409,
-        { idempotencyKey: approval.id, retryAfterSeconds: Math.ceil((leaseMs - (Date.now() - startedAt)) / 1000) },
-      );
-    }
-    const resumed = await repo().updateApproval(approval.id, approval.version, {
-      status: "EXECUTING",
-      executionResult: {
-        ...approval.executionResult,
-        idempotencyKey: approval.id,
-        startedAt: nowIso(),
-        resumeCount: Number(approval.executionResult.resumeCount ?? 0) + 1,
-      },
-    });
-    if (!resumed) throwVersionConflict("Approval");
-    return { approval: resumed, alreadyExecuted: false as const };
-  }
-  if (approval.status !== "APPROVED") {
+  if (approval.status !== "APPROVED" && approval.status !== "EXECUTING") {
     throw new DomainError("Approval must be approved before execution", "APPROVAL_NOT_APPROVED", 409);
   }
 
@@ -550,6 +524,33 @@ export async function claimApprovalForExecution(
     if (current.lead.doNotContact || current.lead.status === "DO_NOT_CONTACT") {
       throw new DomainError("Lead is now do-not-contact", "DO_NOT_CONTACT", 403);
     }
+  }
+
+  if (approval.status === "EXECUTING") {
+    const startedAt = typeof approval.executionResult.startedAt === "string"
+      ? new Date(approval.executionResult.startedAt).getTime()
+      : 0;
+    const leaseSeconds = Number(process.env.APPROVAL_EXECUTION_LEASE_SECONDS ?? "300");
+    const leaseMs = Number.isFinite(leaseSeconds) && leaseSeconds >= 0 ? leaseSeconds * 1000 : 300000;
+    if (startedAt && Date.now() - startedAt < leaseMs) {
+      throw new DomainError(
+        "Approval execution is already in progress",
+        "APPROVAL_EXECUTION_IN_PROGRESS",
+        409,
+        { idempotencyKey: approval.id, retryAfterSeconds: Math.ceil((leaseMs - (Date.now() - startedAt)) / 1000) },
+      );
+    }
+    const resumed = await repo().updateApproval(approval.id, approval.version, {
+      status: "EXECUTING",
+      executionResult: {
+        ...approval.executionResult,
+        idempotencyKey: approval.id,
+        startedAt: nowIso(),
+        resumeCount: Number(approval.executionResult.resumeCount ?? 0) + 1,
+      },
+    });
+    if (!resumed) throwVersionConflict("Approval");
+    return { approval: resumed, alreadyExecuted: false as const };
   }
 
   const claimed = await repo().updateApproval(approval.id, approval.version, {
