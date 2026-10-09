@@ -62,7 +62,7 @@ New entities:
 - `proposals`: versioned scope, pricing, assumptions, dependencies and approval state.
 - `contracts`: versioned contract drafts, signature metadata and exact proposal linkage.
 - `client_projects`: client execution object created from signed contract.
-- `project_obligations`: deliverables, dependencies, payments and support commitments derived from the signed contract.
+- `project_obligations`: deliverables, dependencies, payments and support commitments derived from the signed contract; uniquely keyed by (project_id, source_key), with optimistic version checks on edits.
 
 Audit logs now support generic `entity_type` / `entity_id` in addition to lead references.
 
@@ -299,7 +299,8 @@ Added regression coverage includes:
 - invalid/terminal signature transitions and duplicate callback idempotency;
 - diagnostic immutability after finalization;
 - cross-lead relation rejection;
-- partial project retry reconciliation without duplicate obligations.
+- partial project retry reconciliation without duplicate obligations;
+- stale concurrent updates to project obligations are rejected by required `expectedVersion`.
 
 Repository CI remains the required gate:
 
