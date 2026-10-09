@@ -800,6 +800,15 @@ export async function updateContractSignature(
   actor: ActorContext,
   tool?: string,
 ) {
+  // No signature provider verification adapter is installed in this PR.
+  // Keep direct domain simulations in tests only; fail closed everywhere else.
+  if (process.env.NODE_ENV !== "test") {
+    throw new DomainError(
+      "Signature status changes require a verified provider integration",
+      "SIGNATURE_VERIFICATION_REQUIRED",
+      403,
+    );
+  }
   const contract = await getContract(id);
 
   if (contract.status === input.status) {
