@@ -344,18 +344,6 @@ END
 $$;
 
 
--- Existing per-user MCP credentials receive the new agent-safe scopes.
--- There is intentionally no approvals.approve scope for agents.
-UPDATE public.mcp_credentials
-SET scopes = scopes || '[
-  "diagnostics.read","diagnostics.write",
-  "prospecting.read","prospecting.write",
-  "conversations.read","conversations.write",
-  "messages.send.approved",
-  "approvals.read","approvals.request",
-  "proposals.read","proposals.write","proposals.send.approved",
-  "contracts.read","contracts.draft","contracts.send.approved",
-  "projects.read","projects.write",
-  "ai_runs.read","ai_runs.write"
-]'::jsonb
-WHERE active = true;
+-- Existing per-user MCP credentials intentionally retain their original scopes.
+-- Never widen authorization as a side effect of a schema migration.
+-- Users opt into new agent capabilities by issuing new credentials explicitly.
