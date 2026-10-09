@@ -1,3 +1,4 @@
+import { DomainError } from "@/lib/domain/errors";
 import type { LeadRepository } from "./lead-repository";
 import type { TaskRepository } from "./task-repository";
 import { mockLeadRepository } from "./mock-lead-repository";
@@ -38,5 +39,12 @@ export function getMcpCredentialRepository(): McpCredentialRepository {
 }
 
 export function getAutomationRepository(): AutomationRepository {
+  if (isPostgresDriver() && process.env.AI_COMMERCIAL_AUTOMATION_ENABLED !== "true") {
+    throw new DomainError(
+      "AI commercial automation is disabled until migration 0008 is applied",
+      "AI_COMMERCIAL_AUTOMATION_DISABLED",
+      503,
+    );
+  }
   return isPostgresDriver() ? postgresAutomationRepository : mockAutomationRepository;
 }
