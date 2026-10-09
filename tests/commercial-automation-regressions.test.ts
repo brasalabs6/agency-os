@@ -69,6 +69,7 @@ async function makeLead(status: "QUALIFIED" | "READY_TO_CONTACT" = "QUALIFIED") 
   return createLead({
     name: "Regression " + randomUUID(),
     status,
+    email: "client@example.test",
     sourceType: "TEST",
   }, admin, { allowDuplicate: true, tool: "test" });
 }
