@@ -82,7 +82,7 @@ present. Do not assume Vercel and GitHub Actions deploy at the same instant.
 
 - Dry-run: `node scripts/production-migrations.mjs plan`
 - Approved execution: `node scripts/production-migrations.mjs apply`
-- Tests: `node --test scripts/production-migrations.test.mjs`
+- Tests: `node --test scripts/check-production-migrations.mjs`
 
 Expected environment values:
 `DATABASE_URL` (secret), `PRODUCTION_BACKUP_REFERENCE`,
