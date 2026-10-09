@@ -73,6 +73,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Migration runner safety tests
+        run: node --test scripts/check-production-migrations.mjs
+
       - name: Production build
         run: npm run build
 
