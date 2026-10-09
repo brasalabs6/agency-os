@@ -32,6 +32,10 @@ const previous = {
   whatsapp: process.env.WHATSAPP_SEND_MODE,
   document: process.env.DOCUMENT_SEND_MODE,
   lease: process.env.APPROVAL_EXECUTION_LEASE_SECONDS,
+  whatsappUrl: process.env.WHATSAPP_SEND_WEBHOOK_URL,
+  whatsappIdempotency: process.env.WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED,
+  documentUrl: process.env.DOCUMENT_SEND_WEBHOOK_URL,
+  documentIdempotency: process.env.DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED,
 };
 
 const admin: ActorContext = {
@@ -63,6 +67,14 @@ afterEach(() => {
   else process.env.DOCUMENT_SEND_MODE = previous.document;
   if (previous.lease === undefined) delete process.env.APPROVAL_EXECUTION_LEASE_SECONDS;
   else process.env.APPROVAL_EXECUTION_LEASE_SECONDS = previous.lease;
+  if (previous.whatsappUrl === undefined) delete process.env.WHATSAPP_SEND_WEBHOOK_URL;
+  else process.env.WHATSAPP_SEND_WEBHOOK_URL = previous.whatsappUrl;
+  if (previous.whatsappIdempotency === undefined) delete process.env.WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED;
+  else process.env.WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED = previous.whatsappIdempotency;
+  if (previous.documentUrl === undefined) delete process.env.DOCUMENT_SEND_WEBHOOK_URL;
+  else process.env.DOCUMENT_SEND_WEBHOOK_URL = previous.documentUrl;
+  if (previous.documentIdempotency === undefined) delete process.env.DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED;
+  else process.env.DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED = previous.documentIdempotency;
 });
 
 async function makeLead(status: "QUALIFIED" | "READY_TO_CONTACT" = "QUALIFIED") {
@@ -343,6 +355,53 @@ describe("commercial automation regressions", () => {
       messageId: "mock_" + approved.id,
       idempotencyKey: approved.id,
     });
+  });
+
+  it("fails closed before claiming when WhatsApp adapter has no verified idempotency", async () => {
+    const lead = await createLead({
+      name: "Unverified adapter " + randomUUID(),
+      status: "READY_TO_CONTACT",
+      whatsapp: "+5561644444444",
+      sourceType: "TEST",
+    }, admin, { allowDuplicate: true, tool: "test" });
+    const pending = await createApprovalRequest({
+      leadId: lead.id,
+      actionType: "WHATSAPP_SEND",
+      payload: { to: "+5561644444444", text: "Não enviar" },
+      preview: "Não enviar",
+    }, agent);
+    const approved = await approveRequest(pending.id, {
+      expectedVersion: pending.version,
+    }, admin);
+    process.env.WHATSAPP_SEND_WEBHOOK_URL = "https://example.test/whatsapp";
+    delete process.env.WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED;
+    await expect(executeApprovedWhatsapp(approved.id, agent, "test"))
+      .rejects.toMatchObject({ code: "PROVIDER_IDEMPOTENCY_REQUIRED", status: 503 });
+    expect((await getApproval(approved.id)).status).toBe("APPROVED");
+  });
+
+  it("fails closed before claiming when document adapter has no verified idempotency", async () => {
+    const { proposal } = await makeAcceptedProposal();
+    const contract = await createContractFromProposal(proposal.id, {
+      proposalVersion: proposal.version,
+      templateId: "adapter-safety",
+      templateVersion: "1",
+    }, agent, "test");
+    const pending = await requestContractApproval(
+      contract.id,
+      contract.version,
+      agent,
+      "test",
+      { channel: "EMAIL", to: "client@example.test" },
+    );
+    const approved = await approveRequest(pending.approval.id, {
+      expectedVersion: pending.approval.version,
+    }, admin);
+    process.env.DOCUMENT_SEND_WEBHOOK_URL = "https://example.test/documents";
+    delete process.env.DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED;
+    await expect(executeApprovedContract(approved.id, agent, "test"))
+      .rejects.toMatchObject({ code: "PROVIDER_IDEMPOTENCY_REQUIRED", status: 503 });
+    expect((await getApproval(approved.id)).status).toBe("APPROVED");
   });
 
   it("blocks stale-lease recovery when the lead opted out after the first claim", async () => {
