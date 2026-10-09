@@ -107,8 +107,8 @@ Rules:
 5. specialized proposal/contract approvals can only be created through their specialized state machines;
 6. executor validates expiry, payload hash, policy checks, lead/entity binding, expected status/version and DO_NOT_CONTACT;
 7. executor atomically claims `APPROVED → EXECUTING` before any external side effect;
-8. provider calls receive `Idempotency-Key: <approvalId>`; production adapters MUST honor this key;
-9. an active execution lease rejects concurrent retries; an expired lease may be reclaimed using the same idempotency key for crash recovery;
+8. provider calls receive `Idempotency-Key: <approvalId>`; production adapters MUST honor this key and explicitly opt in after verification, otherwise execution fails closed before claiming;
+9. an active execution lease rejects concurrent retries; an expired lease may be reclaimed using the same idempotency key for crash recovery **only after revalidating expiry, DNC, payload hash, policy and entity binding**;
 10. execution receipt is persisted and audited before the workflow is considered complete.
 
 Human approval/rejection is intentionally absent from MCP scopes/tools.
@@ -138,6 +138,7 @@ Adapter configuration:
 - `WHATSAPP_SEND_MODE=mock` for local/test.
 - `WHATSAPP_SEND_WEBHOOK_URL` for production gateway.
 - `WHATSAPP_API_TOKEN` optional gateway bearer token.
+- `WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED=true` **only after** the adapter has passed a real duplicate-key test; otherwise real sends fail closed before taking the approval claim.
 
 ## Proposal and contract delivery
 
@@ -146,6 +147,7 @@ Approved proposal/contract delivery uses a provider-neutral adapter:
 - `DOCUMENT_SEND_MODE=mock` for local/test.
 - `DOCUMENT_SEND_WEBHOOK_URL` for production.
 - `DOCUMENT_SEND_API_TOKEN` optional bearer token.
+- `DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED=true` **only after** the document adapter demonstrably deduplicates repeated requests with the same `Idempotency-Key`.
 
 Approval payload includes the exact document version and delivery target. Proposal/contract content identity is immutable once it enters approval. Execution rejects stale document versions.
 
