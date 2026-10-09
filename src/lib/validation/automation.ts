@@ -209,6 +209,7 @@ export const projectCreateSchema = z.object({
 });
 
 export const obligationUpdateSchema = z.object({
+  expectedVersion: z.number().int().positive(),
   status: z.enum(["TODO", "DOING", "WAITING", "DONE", "CANCELED"]).optional(),
   dueAt: z.string().datetime().nullable().optional(),
   description: z.string().max(10000).nullable().optional(),
