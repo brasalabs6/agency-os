@@ -265,9 +265,11 @@ export function buildMcpServer(actor: ActorContext) {
     return textResult(await listCalendar(filters));
   });
 
-  registerIntelligenceTools(server, actor);
-  registerCommunicationTools(server, actor);
-  registerSalesAutomationTools(server, actor);
+  if (process.env.AI_COMMERCIAL_AUTOMATION_ENABLED === "true" || process.env.DATA_DRIVER === "mock") {
+    registerIntelligenceTools(server, actor);
+    registerCommunicationTools(server, actor);
+    registerSalesAutomationTools(server, actor);
+  }
 
   return server;
 }
