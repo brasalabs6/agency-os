@@ -1,5 +1,6 @@
 import { DomainError } from "@/lib/domain/errors";
 import { canContact, canTransition, isActiveStatus } from "@/lib/domain/status";
+import { buildLeadEnrichmentPatch, hasStrongLeadIdentityMatch } from "@/lib/domain/lead-upsert";
 import type {
   ActorContext,
   CreateLeadInput,
@@ -66,6 +67,7 @@ export async function createLead(input: CreateLeadInput, actor: ActorContext, op
 export async function upsertLeads(inputs: CreateLeadInput[], actor: ActorContext, tool = "leads_upsert") {
   const created: Lead[] = [];
   const updated: Lead[] = [];
+  const unchanged: Lead[] = [];
   const possibleDuplicates: { input: CreateLeadInput; lead: Lead }[] = [];
   const rejected: { input: CreateLeadInput; error: string }[] = [];
 
@@ -76,40 +78,21 @@ export async function upsertLeads(inputs: CreateLeadInput[], actor: ActorContext
         created.push(await createLead(input, actor, { tool }));
         continue;
       }
-      const highConfidence = Boolean(
-        (input.website && duplicate.website === input.website) ||
-        (input.phone && duplicate.phone === input.phone) ||
-        (input.email && duplicate.email === input.email),
-      );
-      if (!highConfidence) {
+      if (!hasStrongLeadIdentityMatch(input, duplicate)) {
         possibleDuplicates.push({ input, lead: duplicate });
         continue;
       }
-      const patch: UpdateLeadInput = {
-        segment: input.segment ?? duplicate.segment,
-        city: input.city ?? duplicate.city,
-        state: input.state ?? duplicate.state,
-        website: input.website ?? duplicate.website,
-        googleMapsUrl: input.googleMapsUrl ?? duplicate.googleMapsUrl,
-        instagramUrl: input.instagramUrl ?? duplicate.instagramUrl,
-        phone: input.phone ?? duplicate.phone,
-        whatsapp: input.whatsapp ?? duplicate.whatsapp,
-        email: input.email ?? duplicate.email,
-        score: input.score ?? duplicate.score,
-        scoreReasons: input.scoreReasons?.length ? input.scoreReasons : duplicate.scoreReasons,
-        primaryOpportunity: input.primaryOpportunity ?? duplicate.primaryOpportunity,
-        opportunityNotes: input.opportunityNotes ?? duplicate.opportunityNotes,
-        tags: Array.from(new Set([...(duplicate.tags ?? []), ...(input.tags ?? [])])),
-        sourceType: input.sourceType ?? duplicate.sourceType,
-        sourceUrl: input.sourceUrl ?? duplicate.sourceUrl,
-        expectedVersion: duplicate.version,
-      };
+      const patch = buildLeadEnrichmentPatch(input, duplicate);
+      if (!patch) {
+        unchanged.push(duplicate);
+        continue;
+      }
       updated.push(await updateLead(duplicate.id, patch, actor, tool));
     } catch (error) {
       rejected.push({ input, error: error instanceof Error ? error.message : "Unknown error" });
     }
   }
-  return { created, updated, possibleDuplicates, rejected };
+  return { created, updated, unchanged, possibleDuplicates, rejected };
 }
 
 export async function updateLead(id: string, input: UpdateLeadInput, actor: ActorContext, tool?: string) {
