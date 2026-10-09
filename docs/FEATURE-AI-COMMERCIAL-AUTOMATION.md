@@ -332,3 +332,32 @@ Production DoD is separate and additionally requires:
 - multi-account MCP E2E;
 - real-message/doc/signature smoke with approved test recipients;
 - production health verification after deployment.
+
+
+## Merge-readiness hardening (09/10/2026)
+
+The initial PR is **safe to merge independently of activating production integrations**:
+
+- `AI_COMMERCIAL_AUTOMATION_ENABLED=false` (default) keeps all new
+  Postgres-backed automation endpoints fail-closed (503), hides the new app
+  navigation, prevents ORM reads from the existing lead detail and omits new
+  MCP tool registration for Postgres deployments. Set `true` only **after**
+  migration 0008 has been applied and verified in the target DB.
+- Newly registered WhatsApp channel records start as `DISCONNECTED`, with
+  read-only capability. A real gateway handshake is a separate feature.
+- Pre-existing per-user MCP credentials retain their exact scopes during
+  migration. Existing users must explicitly create a new per-user credential
+  to opt into the new agent-safe scopes (no agent approval scope).
+- Manual contract signature endpoint returns 403; generic signature webhook
+  returns 503 even with its bearer token. Direct domain signature mutation
+  is restricted to test runs. **A future PR must add provider-specific
+  identity/receipt validation before re-enabling SIGNED/DECLINED.**
+- CI executes migrations 0000–0008 on an actual PostgreSQL 16 instance,
+  checks RLS, uniqueness indexes, no broadening of an existing credential,
+  and writes/reads migrated business_profiles and diagnostics.
+
+**Production rollout:** merge code (new domain disabled) → apply migration
+0008 with a tested backup/rollback plan → verify schema and access privileges
+in the real production DB → activate `AI_COMMERCIAL_AUTOMATION_ENABLED=true`
+explicitly → provision a new MCP credential when needed. Never enable
+provider-side sending or signature callbacks without verified adapters.
