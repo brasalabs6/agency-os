@@ -68,6 +68,6 @@ export interface AutomationRepository {
   updateProject(id: string, changes: Partial<ClientProject>): Promise<ClientProject | null>;
 
   listObligations(projectId: string): Promise<ProjectObligation[]>;
-  createObligation(input: Omit<ProjectObligation, "id" | "createdAt" | "updatedAt">): Promise<ProjectObligation>;
-  updateObligation(id: string, changes: Partial<ProjectObligation>): Promise<ProjectObligation | null>;
+  createObligation(input: Omit<ProjectObligation, "id" | "version" | "createdAt" | "updatedAt">): Promise<ProjectObligation>;
+  updateObligation(id: string, expectedVersion: number, changes: Partial<ProjectObligation>): Promise<ProjectObligation | null>;
 }
