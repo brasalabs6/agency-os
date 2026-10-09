@@ -7,25 +7,39 @@ import type { CreateTaskRepositoryInput, TaskRepository, UpdateTaskRepositoryInp
 
 const iso = (value: Date | null | undefined) => value ? value.toISOString() : null;
 type TaskRow = typeof leadTasks.$inferSelect;
+type TaskLead = LeadTaskView["lead"];
 
 async function userMap(): Promise<Map<string, UserSummary>> {
   const rows = await getDb().select({ id: users.id, name: users.name, email: users.email }).from(users);
   return new Map(rows.map((user) => [user.id, user]));
 }
 
-async function mapTask(row: TaskRow, people?: Map<string, UserSummary>): Promise<LeadTaskView> {
-  const leadRows = await getDb().select({ id: leads.id, name: leads.name, status: leads.status, score: leads.score }).from(leads).where(eq(leads.id, row.leadId)).limit(1);
-  const map = people ?? await userMap();
-  const lead = leadRows[0];
-  if (!lead) throw new Error("Lead not found for task");
+async function taskLeadMap(leadIds: string[]): Promise<Map<string, TaskLead>> {
+  const uniqueLeadIds = Array.from(new Set(leadIds));
+  if (!uniqueLeadIds.length) return new Map();
+  const rows = await getDb()
+    .select({ id: leads.id, name: leads.name, status: leads.status, score: leads.score })
+    .from(leads)
+    .where(inArray(leads.id, uniqueLeadIds));
+  return new Map(rows.map((lead) => [lead.id, lead]));
+}
+
+function mapTask(row: TaskRow, people: Map<string, UserSummary>, lead: TaskLead): LeadTaskView {
   return {
     id: row.id, leadId: row.leadId, title: row.title, description: row.description, type: row.type, status: row.status,
     priority: row.priority, dueAt: iso(row.dueAt), startAt: iso(row.startAt), endAt: iso(row.endAt), allDay: row.allDay,
-    owner: row.ownerId ? map.get(row.ownerId) ?? null : null, order: row.sortOrder, createdByType: row.createdByType,
+    owner: row.ownerId ? people.get(row.ownerId) ?? null : null, order: row.sortOrder, createdByType: row.createdByType,
     createdById: row.createdById, completedAt: iso(row.completedAt), canceledAt: iso(row.canceledAt),
     createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), version: row.version,
     lead,
   };
+}
+
+async function hydrateTask(row: TaskRow): Promise<LeadTaskView> {
+  const people = await userMap();
+  const lead = (await taskLeadMap([row.leadId])).get(row.leadId);
+  if (!lead) throw new Error("Lead not found for task");
+  return mapTask(row, people, lead);
 }
 
 export class PostgresTaskRepository implements TaskRepository {
@@ -69,14 +83,18 @@ export class PostgresTaskRepository implements TaskRepository {
     const rows = await db.select().from(leadTasks).where(where).orderBy(asc(effective), asc(leadTasks.sortOrder)).limit(limit).offset(offset);
     const countRows = await db.select({ count: sql<number>`count(*)::int` }).from(leadTasks).where(where);
     const people = await userMap();
-    const items: LeadTaskView[] = [];
-    for (const row of rows) items.push(await mapTask(row, people));
+    const leadsById = await taskLeadMap(rows.map((row) => row.leadId));
+    const items = rows.map((row) => {
+      const lead = leadsById.get(row.leadId);
+      if (!lead) throw new Error("Lead not found for task");
+      return mapTask(row, people, lead);
+    });
     return { items, total: countRows[0]?.count ?? 0, limit, offset };
   }
 
   async getById(id: string) {
     const rows = await getDb().select().from(leadTasks).where(eq(leadTasks.id, id)).limit(1);
-    return rows[0] ? mapTask(rows[0]) : null;
+    return rows[0] ? hydrateTask(rows[0]) : null;
   }
 
   async create(input: CreateTaskRepositoryInput) {
@@ -86,7 +104,7 @@ export class PostgresTaskRepository implements TaskRepository {
       endAt: input.endAt ? new Date(input.endAt) : null, allDay: input.allDay ?? false, ownerId: input.ownerId,
       sortOrder: input.order ?? 0, createdByType: input.createdByType, createdById: input.createdById,
     }).returning();
-    return mapTask(rows[0]);
+    return hydrateTask(rows[0]);
   }
 
   async update(id: string, input: UpdateTaskRepositoryInput) {
@@ -105,7 +123,7 @@ export class PostgresTaskRepository implements TaskRepository {
       updatedAt: new Date(), version: sql`${leadTasks.version} + 1` as unknown as number,
     };
     const rows = await getDb().update(leadTasks).set(patch).where(and(...conditions)).returning();
-    return rows[0] ? mapTask(rows[0]) : null;
+    return rows[0] ? hydrateTask(rows[0]) : null;
   }
 }
 
