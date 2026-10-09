@@ -646,6 +646,16 @@ export async function executeApprovedWhatsapp(
   actor: ActorContext,
   tool?: string,
 ) {
+  if (!process.env.WHATSAPP_SEND_WEBHOOK_URL && process.env.WHATSAPP_SEND_MODE !== "mock") {
+    throw new DomainError("WhatsApp send provider is not configured", "WHATSAPP_PROVIDER_NOT_CONFIGURED", 503);
+  }
+  if (process.env.WHATSAPP_SEND_WEBHOOK_URL && process.env.WHATSAPP_PROVIDER_IDEMPOTENCY_CONFIRMED !== "true") {
+    throw new DomainError(
+      "WhatsApp adapter must guarantee provider-side deduplication by Idempotency-Key",
+      "PROVIDER_IDEMPOTENCY_REQUIRED",
+      503,
+    );
+  }
   const claim = await claimApprovalForExecution(id, { actionType: "WHATSAPP_SEND" });
   if (claim.alreadyExecuted) {
     return { approval: claim.approval, result: claim.approval.executionResult };
