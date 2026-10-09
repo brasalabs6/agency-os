@@ -84,7 +84,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Test migration runner
-        run: node --test scripts/production-migrations.test.mjs
+        run: node --test scripts/check-production-migrations.mjs
 
       - name: Run plan or guarded apply
         run: |
