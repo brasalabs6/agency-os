@@ -158,11 +158,11 @@ export class MockAutomationRepository implements AutomationRepository {
   async updateProject(id:string,changes:Partial<ClientProject>){const i=this.projects.findIndex((x)=>x.id===id);if(i<0)return null;const cur=this.projects[i];const updated={...cur,...changes,id:cur.id,updatedAt:now()};this.projects[i]=updated;return clone(updated);}
 
   async listObligations(projectId:string){return clone(this.obligations.filter((x)=>x.projectId===projectId));}
-  async createObligation(input:Omit<ProjectObligation,"id"|"createdAt"|"updatedAt">){
+  async createObligation(input:Omit<ProjectObligation,"id"|"version"|"createdAt"|"updatedAt">){
     const existing=this.obligations.find((x)=>x.projectId===input.projectId&&x.sourceKey===input.sourceKey);if(existing)return clone(existing);
-    const ts=now();const item:ProjectObligation={id:randomUUID(),...input,createdAt:ts,updatedAt:ts};this.obligations.push(item);return clone(item);
+    const ts=now();const item:ProjectObligation={id:randomUUID(),version:1,...input,createdAt:ts,updatedAt:ts};this.obligations.push(item);return clone(item);
   }
-  async updateObligation(id:string,changes:Partial<ProjectObligation>){const i=this.obligations.findIndex((x)=>x.id===id);if(i<0)return null;const cur=this.obligations[i];const updated={...cur,...changes,id:cur.id,updatedAt:now()};this.obligations[i]=updated;return clone(updated);}
+  async updateObligation(id:string,expectedVersion:number,changes:Partial<ProjectObligation>){const i=this.obligations.findIndex((x)=>x.id===id);if(i<0)return null;const cur=this.obligations[i];if(cur.version!==expectedVersion)return null;const updated={...cur,...changes,id:cur.id,version:cur.version+1,updatedAt:now()};this.obligations[i]=updated;return clone(updated);}
 }
 
 export const mockAutomationRepository = new MockAutomationRepository();
