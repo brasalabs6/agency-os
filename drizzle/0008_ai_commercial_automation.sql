@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS public.qualifications (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS qualifications_lead_idx ON public.qualifications(lead_id);
+CREATE UNIQUE INDEX IF NOT EXISTS qualifications_lead_uidx ON public.qualifications(lead_id);
 
 CREATE TABLE IF NOT EXISTS public.proposals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
