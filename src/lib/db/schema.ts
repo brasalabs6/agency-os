@@ -362,7 +362,7 @@ export const qualifications = pgTable("qualifications", {
   createdById: text("created_by_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("qualifications_lead_idx").on(t.leadId)]);
+}, (t) => [uniqueIndex("qualifications_lead_uidx").on(t.leadId)]);
 
 export const proposals = pgTable("proposals", {
   id: uuid("id").primaryKey().defaultRandom(),
