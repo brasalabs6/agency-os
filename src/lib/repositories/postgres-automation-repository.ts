@@ -197,8 +197,8 @@ export class PostgresAutomationRepository implements AutomationRepository {
       serviceFit:input.serviceFit,
       createdByType:input.createdByType,
       createdById:input.createdById,
-    }).returning();
-    return mapQualification(r);
+    }).onConflictDoNothing({target:qualifications.leadId}).returning();
+    return r?mapQualification(r):null;
   }
 
   async listProposals(leadId:string){return (await getDb().select().from(proposals).where(eq(proposals.leadId,leadId)).orderBy(desc(proposals.version))).map(mapProposal);}
