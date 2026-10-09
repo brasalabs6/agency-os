@@ -440,6 +440,7 @@ export const clientProjects = pgTable("client_projects", {
 
 export const projectObligations = pgTable("project_obligations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  version: integer("version").notNull().default(1),
   projectId: uuid("project_id").notNull().references(() => clientProjects.id, { onDelete: "cascade" }),
   sourceContractId: uuid("source_contract_id").notNull().references(() => contracts.id, { onDelete: "restrict" }),
   sourceKey: text("source_key").notNull(),
