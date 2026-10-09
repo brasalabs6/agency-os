@@ -30,6 +30,29 @@ describe("mock automation repository", () => {
     expect(stale).toBeNull();
   });
 
+  it("enforces optimistic version on contract obligations", async () => {
+    const repo = new MockAutomationRepository();
+    const projectId = "00000000-0000-4000-8000-000000000015";
+    const contractId = "00000000-0000-4000-8000-000000000016";
+    const item = await repo.createObligation({
+      projectId,
+      sourceContractId: contractId,
+      sourceKey: "deliverable:0",
+      party: "AGENCY",
+      kind: "DELIVERABLE",
+      title: "Site",
+      status: "TODO",
+      description: null,
+      dueAt: null,
+      metadata: {},
+    });
+    expect(item.version).toBe(1);
+    const updated = await repo.updateObligation(item.id, item.version, { status: "DOING" });
+    expect(updated).toMatchObject({ version: 2, status: "DOING" });
+    expect(await repo.updateObligation(item.id, item.version, { status: "DONE" })).toBeNull();
+    expect((await repo.listObligations(projectId))[0].status).toBe("DOING");
+  });
+
   it("looks up AI runs by idempotency key", async () => {
     const repo = new MockAutomationRepository();
     const run = await repo.createAiRun({
