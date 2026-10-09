@@ -289,6 +289,7 @@ CREATE INDEX IF NOT EXISTS client_projects_status_idx ON public.client_projects(
 
 CREATE TABLE IF NOT EXISTS public.project_obligations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  version integer NOT NULL DEFAULT 1,
   project_id uuid NOT NULL REFERENCES public.client_projects(id) ON DELETE CASCADE,
   source_contract_id uuid NOT NULL REFERENCES public.contracts(id) ON DELETE RESTRICT,
   source_key text NOT NULL,
