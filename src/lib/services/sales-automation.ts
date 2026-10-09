@@ -3,6 +3,7 @@ import type { ActorContext } from "@/lib/domain/types";
 import type { Contract, Proposal, Qualification } from "@/lib/domain/automation";
 import { getAutomationRepository } from "@/lib/repositories";
 import { getLead, moveLeadStage } from "./leads";
+import { canTransition } from "@/lib/domain/status";
 import { getDiagnostic } from "./intelligence";
 import {
   automationAudit,
@@ -412,7 +413,7 @@ export async function executeApprovedProposal(
     });
 
     const lead = await getLead(proposal.leadId);
-    const projectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    const projectionSkipped = lead.lead.doNotContact || !canTransition(lead.lead.status, "PROPOSAL_SENT");
     if (!projectionSkipped && lead.lead.status !== "PROPOSAL_SENT") {
       await moveLeadStage(proposal.leadId, "PROPOSAL_SENT", actor, {
         reason: "Approved proposal sent",
@@ -471,7 +472,7 @@ export async function markProposalResponse(
   let leadProjectionSkipped = false;
   if (status === "ACCEPTED") {
     const lead = await getLead(proposal.leadId);
-    leadProjectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    leadProjectionSkipped = lead.lead.doNotContact || !canTransition(lead.lead.status, "NEGOTIATION");
     if (!leadProjectionSkipped && lead.lead.status !== "NEGOTIATION") {
       await moveLeadStage(proposal.leadId, "NEGOTIATION", actor, {
         reason: "Proposal accepted; contract preparation started",
@@ -856,7 +857,7 @@ export async function updateContractSignature(
   let leadProjectionSkipped = false;
   if (input.status === "SIGNED") {
     const lead = await getLead(contract.leadId);
-    leadProjectionSkipped = lead.lead.status === "DO_NOT_CONTACT" || lead.lead.status === "INVALID";
+    leadProjectionSkipped = lead.lead.doNotContact || !canTransition(lead.lead.status, "WON");
     if (!leadProjectionSkipped && lead.lead.status !== "WON" && lead.lead.status !== "ONBOARDING") {
       await moveLeadStage(contract.leadId, "WON", actor, {
         reason: "Contract signed",
