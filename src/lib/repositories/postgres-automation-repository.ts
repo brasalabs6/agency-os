@@ -57,7 +57,7 @@ function mapProject(r: typeof clientProjects.$inferSelect): ClientProject {
   return { id:r.id,leadId:r.leadId,contractId:r.contractId,name:r.name,status:r.status,ownerUserId:r.ownerUserId,startedAt:iso(r.startedAt),targetAt:iso(r.targetAt),completedAt:iso(r.completedAt),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 function mapObligation(r: typeof projectObligations.$inferSelect): ProjectObligation {
-  return { id:r.id,projectId:r.projectId,sourceContractId:r.sourceContractId,sourceKey:r.sourceKey,party:r.party as ProjectObligation["party"],kind:r.kind as ProjectObligation["kind"],title:r.title,description:r.description,status:r.status,dueAt:iso(r.dueAt),metadata:obj(r.metadata),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
+  return { id:r.id,projectId:r.projectId,sourceContractId:r.sourceContractId,sourceKey:r.sourceKey,version:r.version,party:r.party as ProjectObligation["party"],kind:r.kind as ProjectObligation["kind"],title:r.title,description:r.description,status:r.status,dueAt:iso(r.dueAt),metadata:obj(r.metadata),createdAt:r.createdAt.toISOString(),updatedAt:r.updatedAt.toISOString() };
 }
 
 export class PostgresAutomationRepository implements AutomationRepository {
@@ -232,14 +232,22 @@ export class PostgresAutomationRepository implements AutomationRepository {
     const [r]=await getDb().update(clientProjects).set({name:changes.name,status:changes.status,ownerUserId:changes.ownerUserId,startedAt:changes.startedAt?new Date(changes.startedAt):changes.startedAt===null?null:undefined,targetAt:changes.targetAt?new Date(changes.targetAt):changes.targetAt===null?null:undefined,completedAt:changes.completedAt?new Date(changes.completedAt):changes.completedAt===null?null:undefined,updatedAt:new Date()}).where(eq(clientProjects.id,id)).returning();return r?mapProject(r):null;
   }
   async listObligations(projectId:string){return (await getDb().select().from(projectObligations).where(eq(projectObligations.projectId,projectId)).orderBy(projectObligations.createdAt)).map(mapObligation);}
-  async createObligation(input:Omit<ProjectObligation,"id"|"createdAt"|"updatedAt">){
+  async createObligation(input:Omit<ProjectObligation,"id"|"version"|"createdAt"|"updatedAt">){
     const [r]=await getDb().insert(projectObligations).values({projectId:input.projectId,sourceContractId:input.sourceContractId,sourceKey:input.sourceKey,party:input.party,kind:input.kind,title:input.title,description:input.description,status:input.status,dueAt:input.dueAt?new Date(input.dueAt):null,metadata:input.metadata}).onConflictDoNothing({target:[projectObligations.projectId,projectObligations.sourceKey]}).returning();
     if(r)return mapObligation(r);
     const [existing]=await getDb().select().from(projectObligations).where(and(eq(projectObligations.projectId,input.projectId),eq(projectObligations.sourceKey,input.sourceKey))).limit(1);
     if(!existing)throw new Error("Obligation conflict without existing row");return mapObligation(existing);
   }
-  async updateObligation(id:string,changes:Partial<ProjectObligation>){
-    const [r]=await getDb().update(projectObligations).set({status:changes.status,dueAt:changes.dueAt?new Date(changes.dueAt):changes.dueAt===null?null:undefined,description:changes.description,metadata:changes.metadata,updatedAt:new Date()}).where(eq(projectObligations.id,id)).returning();return r?mapObligation(r):null;
+  async updateObligation(id:string,expectedVersion:number,changes:Partial<ProjectObligation>){
+    const [r]=await getDb().update(projectObligations).set({
+      status:changes.status,
+      dueAt:changes.dueAt?new Date(changes.dueAt):changes.dueAt===null?null:undefined,
+      description:changes.description,
+      metadata:changes.metadata,
+      version:sql`${projectObligations.version} + 1` as unknown as number,
+      updatedAt:new Date(),
+    }).where(and(eq(projectObligations.id,id),eq(projectObligations.version,expectedVersion))).returning();
+    return r?mapObligation(r):null;
   }
 }
 export const postgresAutomationRepository = new PostgresAutomationRepository();
