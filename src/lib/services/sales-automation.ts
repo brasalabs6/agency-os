@@ -21,6 +21,19 @@ const repo = () => getAutomationRepository();
 
 type DeliveryTarget = { channel: "EMAIL" | "WHATSAPP" | "OTHER"; to: string };
 
+function ensureDocumentDeliveryReady() {
+  if (!process.env.DOCUMENT_SEND_WEBHOOK_URL && process.env.DOCUMENT_SEND_MODE !== "mock") {
+    throw new DomainError("Document send provider is not configured", "DOCUMENT_PROVIDER_NOT_CONFIGURED", 503);
+  }
+  if (process.env.DOCUMENT_SEND_WEBHOOK_URL && process.env.DOCUMENT_PROVIDER_IDEMPOTENCY_CONFIRMED !== "true") {
+    throw new DomainError(
+      "Document adapter must guarantee provider-side deduplication by Idempotency-Key",
+      "PROVIDER_IDEMPOTENCY_REQUIRED",
+      503,
+    );
+  }
+}
+
 async function deliverDocument(
   kind: "PROPOSAL" | "CONTRACT",
   payload: Record<string, unknown>,
@@ -361,6 +374,7 @@ export async function executeApprovedProposal(
   actor: ActorContext,
   tool?: string,
 ) {
+  ensureDocumentDeliveryReady();
   const approval = await getApproval(approvalId);
   const proposalId = String(approval.payload.proposalId ?? "");
   const proposal = await getProposal(proposalId);
@@ -712,6 +726,7 @@ export async function executeApprovedContract(
   actor: ActorContext,
   tool?: string,
 ) {
+  ensureDocumentDeliveryReady();
   const approval = await getApproval(approvalId);
   const contractId = String(approval.payload.contractId ?? "");
   const contract = await getContract(contractId);
