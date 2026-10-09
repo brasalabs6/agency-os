@@ -93,7 +93,7 @@ export async function upsertQualification(
   input: Omit<Qualification,
     "id" | "leadId" | "version" | "createdAt" | "updatedAt" |
     "createdByType" | "createdById">,
-  expectedVersion: number,
+  expectedVersion: number | undefined,
   actor: ActorContext,
   tool?: string,
 ) {
