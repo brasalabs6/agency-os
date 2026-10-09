@@ -311,6 +311,7 @@ export interface ClientProject {
 
 export interface ProjectObligation {
   id: string;
+  version: number;
   projectId: string;
   sourceContractId: string;
   sourceKey: string;
