@@ -310,7 +310,7 @@ export async function requestProposalApproval(
   expectedVersion: number,
   actor: ActorContext,
   tool?: string,
-  delivery: DeliveryTarget,
+  delivery?: DeliveryTarget,
 ) {
   const proposal = await getProposal(id);
   if (proposal.status !== "DRAFT") {
