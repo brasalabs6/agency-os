@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ActorContext } from "@/lib/domain/types";
 import { getAutomationRepository } from "@/lib/repositories";
 import { createChannelConnection } from "@/lib/services/communications";
@@ -20,15 +20,14 @@ const original = {
   driver: process.env.DATA_DRIVER,
   flag: process.env.AI_COMMERCIAL_AUTOMATION_ENABLED,
   signature: process.env.SIGNATURE_WEBHOOK_TOKEN,
-  environment: process.env.NODE_ENV,
 };
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const [key, value] of Object.entries({
     DATA_DRIVER: original.driver,
     AI_COMMERCIAL_AUTOMATION_ENABLED: original.flag,
     SIGNATURE_WEBHOOK_TOKEN: original.signature,
-    NODE_ENV: original.environment,
   })) {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
@@ -54,7 +53,7 @@ describe("safe merge and rollout guards", () => {
 
   it("rejects production signature domain transitions without a provider verifier", async () => {
     process.env.DATA_DRIVER = "mock";
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     await expect(updateContractSignature(randomUUID(), {
       status: "SIGNED",
       externalSignatureId: "unverified",
