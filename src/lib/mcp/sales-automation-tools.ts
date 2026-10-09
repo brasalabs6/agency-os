@@ -216,6 +216,7 @@ export function registerSalesAutomationTools(server: McpServer, actor: ActorCont
     annotations: mcpWriteAnnotations,
     inputSchema: z.object({
       obligationId: z.string().uuid(),
+      expectedVersion: z.number().int().positive(),
       status: z.enum(["TODO", "DOING", "WAITING", "DONE", "CANCELED"]).optional(),
       dueAt: z.string().datetime().nullable().optional(),
       description: z.string().max(10000).nullable().optional(),
