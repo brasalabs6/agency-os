@@ -5,5 +5,5 @@ export const dynamic = "force-dynamic";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const user = await requireCurrentUser();
-  return <AppShell user={user}>{children}</AppShell>;
+  return <AppShell user={user} aiCommercialEnabled={process.env.AI_COMMERCIAL_AUTOMATION_ENABLED === "true"}>{children}</AppShell>;
 }
