@@ -36,18 +36,26 @@ export function registerScriptFlowTools(server:McpServer,actor:ActorContext) {
     title:"Create or replace draft script graph",
     description:"mode=create requires creationKey, title, channel, purpose and graph. mode=replace requires scriptId and expectedVersion; published versions are never changed.",
     annotations:mcpWriteAnnotations,
-    inputSchema:z.object({
-      mode:z.enum(["create","replace"]),leadId:z.string().uuid(),scriptId:z.string().uuid().optional(),
-      creationKey:z.string().min(1).max(180).optional(),title:z.string().min(1).max(180).optional(),
-      channel:z.enum(SCRIPT_CHANNELS).optional(),purpose:z.enum(SCRIPT_PURPOSES).optional(),
-      graph:scriptGraphSchema,expectedVersion:z.number().int().positive().optional(),summary:z.string().max(500).optional(),
-    }),
+    inputSchema:z.discriminatedUnion("mode",[
+      z.strictObject({
+        mode:z.literal("create"),leadId:z.string().uuid(),
+        creationKey:z.string().trim().min(1).max(180),
+        title:z.string().trim().min(1).max(180),
+        channel:z.enum(SCRIPT_CHANNELS),purpose:z.enum(SCRIPT_PURPOSES),
+        graph:scriptGraphSchema,
+      }),
+      z.strictObject({
+        mode:z.literal("replace"),leadId:z.string().uuid(),scriptId:z.string().uuid(),
+        expectedVersion:z.number().int().positive(),graph:scriptGraphSchema,
+        summary:z.string().max(500).optional(),
+      }),
+    ]),
   },async args=>{
     requireScope(actor,"scripts.write");
     if(args.mode==="create")return mcpTextResult(await createLeadScript(args.leadId,{
       creationKey:args.creationKey,title:args.title,channel:args.channel,purpose:args.purpose,graph:args.graph,
     },actor,"lead_script_upsert"));
-    return mcpTextResult(await replaceLeadScript(args.leadId,args.scriptId??"",{
+    return mcpTextResult(await replaceLeadScript(args.leadId,args.scriptId,{
       expectedVersion:args.expectedVersion,graph:args.graph,summary:args.summary
     },actor,"lead_script_upsert"));
   });
