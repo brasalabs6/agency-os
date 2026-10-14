@@ -7,6 +7,8 @@ import { LeadActions } from "@/components/lead-actions";
 import { LeadScore } from "@/components/lead-score";
 import { LeadTasksCard } from "@/components/lead-tasks-card";
 import { LeadAutomationPanel } from "@/components/lead-automation-panel";
+import { LeadScriptWorkspace } from "@/components/lead-script-navigator";
+import { scriptsEnabled } from "@/lib/services/script-flows";
 import { StatusBadge } from "@/components/status-badge";
 import { DomainError } from "@/lib/domain/errors";
 import { getLead, listUsers } from "@/lib/services/leads";
@@ -15,8 +17,9 @@ import { getAutomationBundle } from "@/lib/services/intelligence";
 
 const opportunityLabels: Record<string, string> = { WEBSITE: "Website", LANDING_PAGE: "Landing page", DIGITAL_CATALOG: "Catálogo digital", GOOGLE_BUSINESS: "Google Business", AUTOMATION: "Automação", CUSTOM_SYSTEM: "Sistema personalizado", OTHER: "Outro" };
 
-export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeadPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
+  const tab = (await searchParams).tab === "scripts" && scriptsEnabled() ? "scripts" : "overview";
   let data; try { data = await getLead(id); } catch (error) { if (error instanceof DomainError && error.status === 404) notFound(); throw error; }
   const { lead, activities, evidence, tasks } = data;
   const [users, currentUser, automation] = await Promise.all([listUsers(), requireCurrentUser(), getAutomationBundle(id)]);
@@ -30,6 +33,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       <LeadActions lead={lead} users={users} currentUserId={currentUser.id}/>
     </header>
 
+    {scriptsEnabled() ? <nav aria-label="Seções do lead" className="mb-5 flex gap-2 border-b border-default">
+      <Link href={"/leads/"+lead.id} aria-current={tab==="overview"?"page":undefined}
+        className={"rounded-t-lg px-4 py-2 text-sm "+(tab==="overview"?"border-b-2 border-[var(--accent)] font-semibold":"text-muted hover:text-[var(--text)]")}>Visão geral</Link>
+      <Link href={"/leads/"+lead.id+"?tab=scripts"} aria-current={tab==="scripts"?"page":undefined}
+        className={"rounded-t-lg px-4 py-2 text-sm "+(tab==="scripts"?"border-b-2 border-[var(--accent)] font-semibold":"text-muted hover:text-[var(--text)]")}>Script de conversa</Link>
+    </nav> : null}
+    {tab==="scripts" ? <LeadScriptWorkspace leadId={lead.id} role={currentUser.role}/> : <>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
         <section className="surface-flat rounded-xl p-4 sm:p-5"><div className="mb-4 flex items-start justify-between gap-4"><div><h2 className="text-sm font-semibold">Oportunidade</h2><p className="mt-1 text-xs text-muted">Hipótese comercial baseada em evidências registradas.</p></div><LeadScore score={lead.score}/></div><div className="grid gap-4 sm:grid-cols-2"><div><div className="text-[10px] uppercase tracking-wide text-muted">Serviço recomendado</div><div className="mt-1 text-sm font-medium">{lead.primaryOpportunity ? opportunityLabels[lead.primaryOpportunity] : "Não definido"}</div></div><div><div className="text-[10px] uppercase tracking-wide text-muted">Razões do score</div><ul className="mt-1 space-y-1 text-sm">{lead.scoreReasons.map((reason) => <li key={reason}>• {reason}</li>)}</ul></div></div>{lead.opportunityNotes ? <p className="mt-4 border-t border-default pt-4 text-sm leading-6 text-[color:var(--text)]/80">{lead.opportunityNotes}</p> : null}</section>
@@ -48,6 +58,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     <div className="mt-5">
       <LeadAutomationPanel leadId={lead.id} data={automation}/>
     </div>
+    </>}
   </>;
 }
 

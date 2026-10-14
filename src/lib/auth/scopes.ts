@@ -22,6 +22,8 @@ export const AGENT_SCOPES = [
   "projects.write",
   "ai_runs.read",
   "ai_runs.write",
+  "scripts.read",
+  "scripts.write",
 ] as const;
 
 export type AgentScope = (typeof AGENT_SCOPES)[number];

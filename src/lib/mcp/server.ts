@@ -22,6 +22,8 @@ import { cancelTask, completeTask, createTask, getTask, listCalendar, listTasks,
 import { registerIntelligenceTools } from "./intelligence-tools";
 import { registerCommunicationTools } from "./communication-tools";
 import { registerSalesAutomationTools } from "./sales-automation-tools";
+import { registerScriptFlowTools } from "./script-flow-tools";
+import { scriptsEnabled } from "@/lib/services/script-flows";
 
 const textResult = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
@@ -271,6 +273,7 @@ export function buildMcpServer(actor: ActorContext) {
     registerSalesAutomationTools(server, actor);
   }
 
+  if (scriptsEnabled()) registerScriptFlowTools(server, actor);
   return server;
 }
 
