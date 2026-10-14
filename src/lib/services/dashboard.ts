@@ -106,7 +106,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     0,
   );
 
-  const taskMetrics = taskRows[0] ?? {
+  const taskMetrics = taskRows.rows[0] ?? {
     tasks_today: 0,
     overdue_tasks: 0,
     meetings_today: 0,

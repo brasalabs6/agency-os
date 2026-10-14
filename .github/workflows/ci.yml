@@ -303,6 +303,36 @@ jobs:
           END $verify$;
           SQL
 
+
+      - name: Set up Node.js for real PostgreSQL smoke
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Smoke Drizzle read and transaction with bounded pool
+        env:
+          DATABASE_URL: postgresql://agencyos:agencyos@127.0.0.1:5432/agencyos
+          DATA_DRIVER: postgres
+        run: |
+          set -euo pipefail
+          npm ci
+          node --import tsx --input-type=module <<'NODE'
+          import { sql } from "drizzle-orm";
+          import { getDb } from "./src/lib/db/client.ts";
+          const db = getDb();
+          const reads = await Promise.all(Array.from({ length: 24 }, () => db.execute(sql`select 1::int as value`)));
+          for (const result of reads) {
+            if (result.rows?.[0]?.value !== 1) throw new Error("Parallel SELECT failed");
+          }
+          const transaction = await db.transaction(async tx => {
+            const result = await tx.execute(sql`select 7::int as value`);
+            return result.rows?.[0]?.value;
+          });
+          if (transaction !== 7) throw new Error("Transaction smoke failed");
+          console.log("Node-postgres/Drizzle smoke passed: 24 concurrent SELECTs, one transaction");
+          NODE
+
   preview-deployment:
     name: Vercel Preview
     if: github.event_name == 'pull_request'
@@ -338,3 +368,4 @@ jobs:
 
           echo "Timed out waiting for Vercel preview status" >&2
           exit 1
+
