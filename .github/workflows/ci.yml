@@ -338,3 +338,28 @@ jobs:
 
           echo "Timed out waiting for Vercel preview status" >&2
           exit 1
+
+
+  temporary-driver-lock:
+    name: Generate emergency pg lockfile (temporary)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Resolve pinned PostgreSQL driver dependencies
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --save-exact pg@8.16.3
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --save-dev --save-exact @types/pg@8.15.5
+          npm uninstall --package-lock-only --ignore-scripts --no-audit --no-fund postgres
+          echo 'PG_DRIVER_LOCK_BEGIN'
+          base64 -w0 package-lock.json
+          echo
+          echo 'PG_DRIVER_LOCK_END'
