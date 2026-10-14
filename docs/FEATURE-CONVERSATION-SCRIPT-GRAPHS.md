@@ -1,10 +1,10 @@
 # Feature Spec — Conversation Script Graphs (roteiros comerciais navegáveis)
 
 **Produto:** AgencyOS Leads  
-**Status:** Proposed / Awaiting approval  
+**Status:** In progress (implementation PR #60; not deployed or production-enabled)  
 **Prioridade:** P1 — planejamento para implementação futura  
 **Base de análise:** main @ 8e9c48d010bdc9d904347f3f1563eabcbca8a775 (2026-10-14)  
-**Escopo desta entrega:** apenas especificação; não há implementação, migration aplicada, feature ativada ou deploy neste PR.
+**Escopo desta spec:** contrato aprovado no PR #59. A implementação ocorre no PR #60; migration, feature flag e deploy de produção permanecem operações separadas.
 
 ## 1. Objetivo
 
@@ -400,7 +400,7 @@ A aba contém:
 
 - Adicionar scripts.read / scripts.write em src/lib/auth/scopes.ts → AGENT_SCOPES; scripts.publish apenas no conjunto humano ADMIN (não em AGENT_SCOPES ou credenciais MCP).
 - Respeitar tipo USER vs AGENT e checar role ADMIN no service de publish/restore (scope sozinho não basta).
-- Credenciais pessoais guardam scopes como JSONB; atualizar AGENT_SCOPES **não atualiza as já emitidas**. Planejar migration controlada que acrescente scripts.read/write **a credenciais ativas existentes elegíveis**, sem ressuscitar revogadas/inativas nem conceder scripts.publish.
+- Credenciais pessoais guardam scopes como JSONB; atualizar AGENT_SCOPES **não atualiza as já emitidas**. **Não** conceder novos scopes automaticamente via schema migration: usuários devem revogar/reemitir credenciais para aderir explicitamente à feature. Esta decisão respeita AGENTS.md e o contrato da migration 0008; scripts.publish nunca pertence a credenciais MCP.
 - Testar duas credenciais diferentes; revogar uma não afeta outra. Não expor tokens / URLs com key em logs ou auditoria.
 
 ### 13.2 Segurança do conteúdo
@@ -442,7 +442,7 @@ Usar audit_logs existente via padrão automationAudit/getLeadRepository().addAud
 Sequência obrigatória:
 
 1. Implementação em branch/PR após aprovação desta spec; testes mock, PostgreSQL e E2E.
-2. Migration 0009 aplicada **deliberadamente** em produção, com verificação de tabelas, FKs, índices, RLS, privilégios e concessão de scopes.
+2. Migration 0009 aplicada **deliberadamente** em produção, com verificação de tabelas, FKs, índices, RLS e privilégios; credenciais MCP existentes mantêm exatamente seus scopes.
 3. Deploy de código ainda com feature flag desligada.
 4. Ativação controlada da feature flag em ambiente que já possua migration.
 5. Smoke autenticado UI + REST + MCP com agentes pessoalmente credenciados e papéis diferentes.
@@ -454,7 +454,7 @@ Não quebrar /mcp discovery existente, outras tools, dashboards, tabs ou página
 
 - Desabilitar CONVERSATION_SCRIPTS_ENABLED: esconder aba/novas tools e retornar erro controlado nas APIs; preservar toda informação.
 - Reverter deploy se necessário; **não** fazer DROP de scripts/revisions em rollback emergencial.
-- Reavaliar scopes adicionados somente com migration reversa segura e plano explícito; jamais revogar credenciais alheias ou sobrescrever grants adicionais.
+- Preservar os scopes de credenciais existentes; nenhuma mudança automática de credencial é necessária durante rollback.
 - Reativar após correção com os mesmos snapshots e versões.
 
 ## 16. Arquivos esperados na implementação futura
@@ -495,7 +495,7 @@ Reaproveitar auth, audit, services, ApprovalRequest, Conversation e Qualificatio
 6. Dois agentes tentam patches com mesma expectedVersion; um vence, outro recebe 409 e não perde alterações.
 7. Retry de create com mesma creationKey não duplica; chave reaproveitada com conteúdo divergente gera 409.
 8. Recuperação de revisão antiga cria novo draft, mantendo as revisões anteriores imutáveis.
-9. Credencial MCP emitida **antes** da migration recebe os novos scopes elegíveis; credencial revogada continua inválida.
+9. Credencial MCP emitida **antes** da migration mantém os scopes antigos; após reemissão voluntária a nova credencial possui scripts.read/write; credencial revogada continua inválida.
 10. Script com markup perigoso permanece visível apenas como texto; tentativas de uso de lead/evidência de terceiro são bloqueadas.
 11. Em produção, flag desligada antes da migration preserva /leads/:id; com migration + flag ligada, UI/REST/MCP funcionam para contas distintas.
 
@@ -518,17 +518,17 @@ Reaproveitar auth, audit, services, ApprovalRequest, Conversation e Qualificatio
 - [ ] Aba do lead com **Modo Guiado funcionando sem depender do mapa**.
 - [ ] Modo Mapa React Flow com seleção e trilha sincronizada.
 - [ ] Conteúdo seguro e nenhuma persistência de reações simuladas como reais.
-- [ ] Dois usuários/credenciais, credenciais antigas e revogação testados.
+- [ ] Dois usuários/credenciais, preservação dos scopes antigos, reemissão voluntária e revogação testados.
 - [ ] Lint, typecheck, unit, build, integração, E2E e smoke aprovados.
 - [ ] README/MCP docs refletem o estado efetivamente implementado.
 - [ ] Rollout e verificação de produção registrados separadamente.
 
 ## 19. Pendências e gate de aprovação
 
-Esta spec é uma **proposta**, não uma declaração de feature existente. Antes de iniciar código, aprovar explicitamente:
+Esta spec é o contrato da **implementação em andamento**, não uma declaração de feature ativa em produção. Antes de iniciar código, aprovar explicitamente:
 
 1. política editorial **ADMIN publica; MEMBER/AGENT editam rascunhos**;
-2. concessão dos novos scopes a credenciais pessoais *ativas existentes* mediante migration;
+2. reemissão voluntária de credenciais MCP (sem auto-concessão por migration);
 3. limites iniciais do grafo e o comportamento de preview de draft;
 4. nome de feature flag e escopo de entrega (navegador guiado + mapa, sem acompanhamento real).
 

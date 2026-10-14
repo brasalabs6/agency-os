@@ -347,3 +347,17 @@ MCP_AUTH_MODE=user_query_token
 O banco guarda somente SHA-256 da credential; o segredo completo é exibido uma única vez. O Agent MCP continua com `actorType=AGENT`, mas carrega `principalUserId` para suportar `mine` e `assignToMe`.
 
 Veja `docs/FEATURE-PER-USER-CHATGPT-MCP-CREDENTIALS.md`.
+
+
+## Conversation Script Graphs (gated; migration required)
+
+A implementação de roteiros comerciais ramificados por lead utiliza os mesmos services do REST/MCP. **Não fica ativa apenas pelo deploy do código.** Antes de habilitar em um ambiente PostgreSQL:
+
+1. aplique deliberadamente a migration `drizzle/0009_lead_conversation_scripts.sql`;
+2. verifique as tabelas, FKs e privilégios; credenciais MCP antigas **não** recebem scopes novos automaticamente. O usuário deve emitir uma nova credencial explicitamente;
+3. configure `CONVERSATION_SCRIPTS_ENABLED=true` e reimplante;
+4. teste `/leads/:id?tab=scripts` e as tools `lead_scripts_list`, `lead_script_get`, `lead_script_upsert` e `lead_script_patch`.
+
+O navegador guiado é a interface principal; o mapa visual permite explorar caminhos. O mapa usa `@xyflow/react` (React Flow), com pan, zoom, minimapa e visualização somente de leitura; o grafo de domínio continua independente da biblioteca visual. Publicar/restaurar revisões exige usuário humano ADMIN via REST; agentes somente criam e editam rascunhos. Explorar caminhos não envia mensagens nem registra reações hipotéticas.
+
+Contrato completo: `docs/FEATURE-CONVERSATION-SCRIPT-GRAPHS.md`.

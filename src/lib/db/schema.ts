@@ -459,3 +459,44 @@ export const projectObligations = pgTable("project_obligations", {
   index("project_obligations_status_idx").on(t.status),
   index("project_obligations_due_idx").on(t.dueAt),
 ]);
+
+
+// Conversation Script Graphs. Revisions are immutable; pointer integrity is enforced
+// by deferrable composite foreign keys in migration 0009.
+export const leadConversationScripts = pgTable("lead_conversation_scripts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  channel: text("channel").$type<import("@/lib/domain/script-flow").ScriptChannel>().notNull(),
+  purpose: text("purpose").$type<import("@/lib/domain/script-flow").ScriptPurpose>().notNull(),
+  version: integer("version").notNull().default(1),
+  draftRevisionId: uuid("draft_revision_id"),
+  publishedRevisionId: uuid("published_revision_id"),
+  creationKey: text("creation_key").notNull(),
+  creationActorId: text("creation_actor_id").notNull(),
+  creationPayloadHash: text("creation_payload_hash").notNull(),
+  createdByType: text("created_by_type").$type<ActorType>().notNull(),
+  createdById: text("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index("lead_scripts_lead_idx").on(t.leadId),
+  index("lead_scripts_lead_updated_idx").on(t.leadId, t.updatedAt),
+  uniqueIndex("lead_scripts_creation_key_uidx").on(t.leadId, t.creationActorId, t.creationKey),
+]);
+
+export const leadConversationScriptRevisions = pgTable("lead_conversation_script_revisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scriptId: uuid("script_id").notNull().references(() => leadConversationScripts.id, { onDelete: "cascade" }),
+  revisionNumber: integer("revision_number").notNull(),
+  baseRevisionId: uuid("base_revision_id"),
+  graph: jsonb("graph").$type<import("@/lib/domain/script-flow").ScriptGraph>().notNull(),
+  changeSummary: text("change_summary"),
+  createdByType: text("created_by_type").$type<ActorType>().notNull(),
+  createdById: text("created_by_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index("script_revisions_script_idx").on(t.scriptId, t.revisionNumber),
+  uniqueIndex("script_revisions_number_uidx").on(t.scriptId, t.revisionNumber),
+  uniqueIndex("script_revisions_scope_uidx").on(t.scriptId, t.id),
+]);

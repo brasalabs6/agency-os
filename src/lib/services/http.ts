@@ -14,8 +14,14 @@ export function errorResponse(error: unknown) {
 export function assertSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (!origin) return;
-  const requestUrl = new URL(request.url);
-  if (new URL(origin).host !== requestUrl.host) throw new DomainError("Invalid request origin", "CSRF_ORIGIN_MISMATCH", 403);
+  // Next.js and reverse proxies can normalize request.url to an internal
+  // hostname. The incoming Host header reflects the browser-facing origin.
+  // Compare the actual request host, not a rewritten internal URL.
+  const host = (request.headers.get("host") ?? new URL(request.url).host).toLowerCase();
+  let originHost: string;
+  try { originHost = new URL(origin).host.toLowerCase(); }
+  catch { throw new DomainError("Invalid request origin", "CSRF_ORIGIN_MISMATCH", 403); }
+  if (originHost !== host) throw new DomainError("Invalid request origin", "CSRF_ORIGIN_MISMATCH", 403);
 }
 
 export async function apiUser() {

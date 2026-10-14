@@ -15,6 +15,14 @@ import type { AutomationRepository } from "./automation-repository";
 import { mockAutomationRepository } from "./mock-automation-repository";
 import { postgresAutomationRepository } from "./postgres-automation-repository";
 
+import type { ScriptFlowRepository } from "./script-flow-repository";
+import { mockScriptFlowRepository } from "./mock-script-flow-repository";
+import { postgresScriptFlowRepository } from "./postgres-script-flow-repository";
+
+export function getScriptFlowRepository(): ScriptFlowRepository {
+  return isPostgresDriver() ? postgresScriptFlowRepository : mockScriptFlowRepository;
+}
+
 function isPostgresDriver(): boolean {
   const driver = process.env.DATA_DRIVER;
   if (driver === "postgres") return true;
