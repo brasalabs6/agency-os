@@ -338,3 +338,29 @@ jobs:
 
           echo "Timed out waiting for Vercel preview status" >&2
           exit 1
+
+
+  lock-generation-temporary:
+    name: Generate React Flow dependency lock (temporary)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Generate reviewed dependency resolution
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --save-exact @xyflow/react@12.12.0
+          echo 'REACT_FLOW_LOCK_BEGIN'
+          base64 -w0 package-lock.json
+          echo
+          echo 'REACT_FLOW_LOCK_END'
