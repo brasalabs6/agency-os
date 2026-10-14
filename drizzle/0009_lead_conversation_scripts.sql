@@ -67,15 +67,6 @@ BEGIN
   END IF;
 END $$;
 
--- Only currently active, non-revoked per-user MCP connections get new internal draft
--- capabilities. Never grant publish nor reactivate expired/revoked connections.
-UPDATE public.mcp_credentials
-SET scopes =
-    CASE WHEN scopes ? 'scripts.read' THEN scopes ELSE scopes || '["scripts.read"]'::jsonb END
-WHERE active = true AND revoked_at IS NULL
-  AND (expires_at IS NULL OR expires_at > now());
-UPDATE public.mcp_credentials
-SET scopes =
-    CASE WHEN scopes ? 'scripts.write' THEN scopes ELSE scopes || '["scripts.write"]'::jsonb END
-WHERE active = true AND revoked_at IS NULL
-  AND (expires_at IS NULL OR expires_at > now());
+-- SECURITY: Existing MCP credentials retain their original granted scopes.
+-- A user must explicitly issue a new credential to opt into scripts.read/scripts.write.
+-- Never widen authorization as a side effect of schema migration (AGENTS.md).

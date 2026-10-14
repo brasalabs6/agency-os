@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { ScriptGraph } from "@/lib/domain/script-flow";
 
 interface TrailStep { nodeId: string; edgeId?: string }
@@ -12,6 +12,29 @@ interface Props {
 
 export function LeadScriptMap({graph,trail,onSelect}:Props) {
   const [zoom,setZoom]=useState(100);
+  const viewport=useRef<HTMLDivElement>(null);
+  const drag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
+
+  function panStart(e:MouseEvent<HTMLDivElement>) {
+    if(e.button!==0 || (e.target as Element).closest('[role="button"]')) return;
+    const el=viewport.current;
+    if(!el)return;
+    drag.current={x:e.clientX,y:e.clientY,left:el.scrollLeft,top:el.scrollTop};
+  }
+  function panMove(e:MouseEvent<HTMLDivElement>) {
+    if(!drag.current||!viewport.current)return;
+    if(e.buttons!==1){drag.current=null;return;}
+    viewport.current.scrollLeft=drag.current.left-(e.clientX-drag.current.x);
+    viewport.current.scrollTop=drag.current.top-(e.clientY-drag.current.y);
+  }
+  function minimapClick(e:MouseEvent<SVGSVGElement>) {
+    const el=viewport.current;if(!el)return;
+    const rect=e.currentTarget.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/rect.width;
+    const y=(e.clientY-rect.top)/rect.height;
+    el.scrollLeft=Math.max(0,x*el.scrollWidth-el.clientWidth/2);
+    el.scrollTop=Math.max(0,y*el.scrollHeight-el.clientHeight/2);
+  }
   const layout=useMemo(()=>{
     const outgoing=new Map<string,string[]>();
     for(const edge of graph.edges)outgoing.set(edge.source,[...(outgoing.get(edge.source)??[]),edge.target]);
@@ -43,9 +66,12 @@ export function LeadScriptMap({graph,trail,onSelect}:Props) {
         <button type="button" onClick={()=>setZoom(z=>Math.max(50,z-25))} className="rounded-md border border-default px-2 py-1 text-sm" aria-label="Diminuir zoom">−</button>
         <span className="w-12 text-center text-xs tabular-nums">{zoom}%</span>
         <button type="button" onClick={()=>setZoom(z=>Math.min(175,z+25))} className="rounded-md border border-default px-2 py-1 text-sm" aria-label="Aumentar zoom">+</button>
+        <button type="button" onClick={()=>{setZoom(100);if(viewport.current){viewport.current.scrollTop=0;viewport.current.scrollLeft=0;}}} className="rounded-md border border-default px-2 py-1 text-xs">Centralizar</button>
       </div>
     </div>
-    <div className="max-h-[550px] overflow-auto rounded-lg bg-[var(--panel-2)]">
+    <div ref={viewport} onMouseDown={panStart} onMouseMove={panMove}
+      onMouseUp={()=>{drag.current=null;}} onMouseLeave={()=>{drag.current=null;}}
+      className="max-h-[550px] overflow-auto rounded-lg bg-[var(--panel-2)] cursor-grab">
       <svg aria-label="Mapa interativo do roteiro comercial" role="group"
         width={layout.width*zoom/100} height={layout.height*zoom/100}
         viewBox={"0 0 "+layout.width+" "+layout.height}>
@@ -80,6 +106,25 @@ export function LeadScriptMap({graph,trail,onSelect}:Props) {
         })}
       </svg>
     </div>
-    <p className="mt-2 text-xs text-muted">Use a rolagem para explorar o mapa. Selecionar um nó aqui não registra uma reação real.</p>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <p className="flex-1 text-xs text-muted">Arraste o espaço vazio para mover o mapa, use zoom e selecione nós para ver scripts. Nada é registrado como reação real.</p>
+      <svg role="button" tabIndex={0} aria-label="Minimapa: clique para navegar"
+        className="cursor-crosshair rounded-md border border-default bg-[var(--panel-2)]"
+        width={174} height={96} viewBox={"0 0 "+layout.width+" "+layout.height}
+        onClick={minimapClick}
+        onKeyDown={e=>{const el=viewport.current;if(!el)return;
+          if(e.key==="ArrowRight"){e.preventDefault();el.scrollLeft+=120;}
+          if(e.key==="ArrowLeft"){e.preventDefault();el.scrollLeft-=120;}
+          if(e.key==="ArrowDown"){e.preventDefault();el.scrollTop+=120;}
+          if(e.key==="ArrowUp"){e.preventDefault();el.scrollTop-=120;}
+        }}>
+        {graph.nodes.map(node=>{
+          const p=layout.positions.get(node.id);
+          if(!p)return null;
+          return <rect key={node.id} x={p.x} y={p.y} width={190} height={52} rx={6}
+            fill={usedNodes.has(node.id)?"#60a5fa":"#94a3b8"} opacity={.9}/>;
+        })}
+      </svg>
+    </div>
   </div>;
 }

@@ -41,6 +41,24 @@ describe("Mock conversation script revisions",()=>{
     expect(d.script.publishedRevisionId).toBe(c.revision!.id);
     expect((await repo.getRevision(a.script.id,a.revision!.id))?.graph.nodes[0].script).toBe("Bom dia");
   });
+  it("serializes parallel commits and rejects one stale writer",async()=>{
+    const repo=new MockScriptFlowRepository(),data=input();
+    const initial=await repo.createWithDraft(data,actor);
+    const attempts=await Promise.allSettled([
+      repo.commitDraft({leadId:data.leadId,scriptId:initial.script.id,expectedVersion:1,graph:baseGraph},actor),
+      repo.commitDraft({leadId:data.leadId,scriptId:initial.script.id,expectedVersion:1,graph:baseGraph},actor),
+    ]);
+    expect(attempts.filter(result=>result.status==="fulfilled")).toHaveLength(1);
+    expect(attempts.filter(result=>result.status==="rejected")).toHaveLength(1);
+    const current=await repo.getByIdAndLead(initial.script.id,data.leadId);
+    expect(current?.version).toBe(2);
+  });
+  it("never returns a script or revision under a different lead",async()=>{
+    const repo=new MockScriptFlowRepository(),data=input();
+    const original=await repo.createWithDraft(data,actor);
+    expect(await repo.getByIdAndLead(original.script.id,randomUUID())).toBeNull();
+    expect(await repo.getRevision(original.script.id,randomUUID())).toBeNull();
+  });
   it("rejects publishing a replaced draft and does not alter revisions",async()=>{
     const repo=new MockScriptFlowRepository(),data=input();
     const first=await repo.createWithDraft(data,actor);

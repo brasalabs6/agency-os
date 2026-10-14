@@ -140,8 +140,7 @@ jobs:
           SQL
           for file in drizzle/[0-9][0-9][0-9][0-9]_*.sql; do
             if [[ "$file" == *"/0008_"* ]]; then
-              # Seed active and revoked credentials before automation migration 0008;
-              # migration 0009 explicitly grants script draft scopes ONLY to active credentials.
+              # Seed a legacy credential; no migration may silently widen its scopes.
               psql -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO public.users (id,name,email,role)
           VALUES ('00000000-0000-4000-8000-000000000001','Migration Tester','test@example.test','ADMIN');
@@ -168,8 +167,8 @@ jobs:
           BEGIN
             SELECT scopes INTO existing_scopes
               FROM public.mcp_credentials WHERE name='pre-migration-credential';
-            IF existing_scopes IS DISTINCT FROM '["leads.read","scripts.read","scripts.write"]'::jsonb THEN
-              RAISE EXCEPTION 'Expected active legacy credential to receive script scopes only: %', existing_scopes;
+            IF existing_scopes IS DISTINCT FROM '["leads.read"]'::jsonb THEN
+              RAISE EXCEPTION 'MCP migration widened an existing credential: %', existing_scopes;
             END IF;
             IF (SELECT scopes FROM public.mcp_credentials WHERE name='revoked-before-migration')
                 IS DISTINCT FROM '["leads.read"]'::jsonb THEN

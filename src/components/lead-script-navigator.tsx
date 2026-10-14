@@ -13,6 +13,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
   const [selectedId,setSelectedId]=useState("");
   const [view,setView]=useState<"published"|"draft">("published");
   const [data,setData]=useState<ScriptView|null>(null);
+  const [loadedSelection,setLoadedSelection]=useState("");
   const [trail,setTrail]=useState<TrailStep[]>([]);
   const [inspectId,setInspectId]=useState<string|null>(null);
   const [mode,setMode]=useState<Mode>("guided");
@@ -48,6 +49,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
         const result=await response.json() as ScriptView;
         if(!ignore){
           setData(result);
+          setLoadedSelection(selectedId+":"+effectiveView);
           setTrail(result.revision?.graph.startNodeId?[{nodeId:result.revision.graph.startNodeId}]:[]);
           setInspectId(null);setNotice("");setError("");
         }
@@ -57,11 +59,13 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
     return ()=>{ignore=true;};
   },[base,selectedId,effectiveView]);
 
-  const graph=selectedId?data?.revision?.graph:undefined;
+  // Never show an earlier lead/script/revision while a new async fetch is pending.
+  const ready=Boolean(selectedId && loadedSelection===selectedId+":"+effectiveView && data?.script.id===selectedId);
+  const graph=ready?data?.revision?.graph:undefined;
   const currentNode=useMemo(()=>graph?.nodes.find(x=>x.id===trail.at(-1)?.nodeId),[graph,trail]);
   const inspection=graph?.nodes.find(x=>x.id===inspectId);
   const choices=graph?.edges.filter(x=>x.source===currentNode?.id)??[];
-  const used=data?.revision?.id===selected?.publishedRevisionId?"Publicado":"Rascunho / Prévia";
+  const used=ready?(data?.revision?.id===selected?.publishedRevisionId?"Publicado":"Rascunho / Prévia"):"Carregando";
 
   function reset(){if(graph){setTrail(graph.startNodeId?[{nodeId:graph.startNodeId}]:[]);setInspectId(null);}}
   function step(target:string,edgeId:string){
@@ -69,7 +73,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
     setTrail(old=>[...old,{nodeId:target,edgeId}]);setInspectId(null);setNotice("");
   }
   async function publish(){
-    if(!selected||!data?.script.draftRevisionId||!confirm("Publicar este rascunho? A versão atualmente publicada permanecerá no histórico."))return;
+    if(!ready||!selected||!data?.script.draftRevisionId||!confirm("Publicar este rascunho? A versão atualmente publicada permanecerá no histórico."))return;
     setBusy(true);setError("");
     try{
       const response=await fetch(base+"/"+selected.id+"/publish",{
@@ -79,7 +83,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
       if(!response.ok){const body=await response.json();throw new Error(body?.error?.message??"Não foi possível publicar");}
       await loadList();setView("published");setNotice("Versão publicada. Atualize a aba para consultar a nova revisão.");
       const result=await response.json() as ScriptView;
-      setData(result);setTrail(result.revision?.graph.startNodeId?[{nodeId:result.revision.graph.startNodeId}]:[]);
+      setData(result);setLoadedSelection(selected.id+":published");setTrail(result.revision?.graph.startNodeId?[{nodeId:result.revision.graph.startNodeId}]:[]);
     }catch(e){setError(e instanceof Error?e.message:"Erro ao publicar");}finally{setBusy(false);}
   }
   return <section className="space-y-4">
@@ -103,10 +107,10 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
           className="rounded-lg border border-default px-3 py-2 text-sm">
           {effectiveView==="draft"?"Ver publicada":"Prévia do rascunho"}
         </button>:null}
-        {role==="ADMIN"&&selected?.draftRevisionId&&effectiveView==="draft"?<button type="button" disabled={busy}
+        {ready&&role==="ADMIN"&&selected?.draftRevisionId&&effectiveView==="draft"?<button type="button" disabled={busy}
           onClick={()=>void publish()} className="rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-50">Publicar rascunho</button>:null}
       </div>
-      {data?.revision?<p className="mt-2 text-xs text-muted">Revisão #{data.revision.revisionNumber} · Versão {data.script.version} · {data.revision.createdAt.slice(0,10)}</p>:null}
+      {ready&&data?.revision?<p className="mt-2 text-xs text-muted">Revisão #{data.revision.revisionNumber} · Versão {data.script.version} · {data.revision.createdAt.slice(0,10)}</p>:null}
     </div>
     {!graph?<div className="surface-flat rounded-xl p-7 text-center text-sm text-muted">
       {selected?"Esta versão não contém um grafo disponível.":"Ainda não há roteiros. O agente pode criá-los pela ferramenta MCP lead_script_upsert."}

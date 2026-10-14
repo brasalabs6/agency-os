@@ -14,6 +14,22 @@ export class MockScriptFlowRepository implements ScriptFlowRepository {
   private scripts: ConversationScript[] = [];
   private revisions: ScriptRevision[] = [];
   private hashes = new Map<string, string>();
+  private locks = new Map<string, Promise<void>>();
+
+  private async exclusively<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.locks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>(resolve => { release = resolve; });
+    const queued = previous.then(() => current);
+    this.locks.set(key, queued);
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.locks.get(key) === queued) this.locks.delete(key);
+    }
+  }
 
   async listByLead(leadId: string, filters: Parameters<ScriptFlowRepository["listByLead"]>[1]) {
     const items = this.scripts.filter(s => s.leadId === leadId
@@ -36,12 +52,11 @@ export class MockScriptFlowRepository implements ScriptFlowRepository {
     return leadId + "|" + actor.id + "|" + key;
   }
   async createWithDraft(input: CreateScriptRecord, actor: ActorContext, tool?: string): Promise<ScriptView> {
+    return this.exclusively("create:" + this.key(input.leadId, actor, input.creationKey), async () => {
     const key = this.key(input.leadId,actor,input.creationKey);
-    const existing = this.scripts.find(x => this.key(x.leadId, { id: x.createdById } as ActorContext, x.id) === key);
-    // Store creation-key indexing separately because scriptId is not an idempotency key.
     const match = this.scripts.find(x => this.hashes.get(x.id + ":key") === key);
-    if (match || existing) {
-      const s = match ?? existing!;
+    if (match) {
+      const s = match;
       if (this.hashes.get(s.id + ":hash") !== input.creationPayloadHash)
         throw new DomainError("Creation key reused with different input", "SCRIPT_CREATION_KEY_CONFLICT", 409);
       return { script: clone(s), revision: await this.getRevision(s.id, s.draftRevisionId ?? s.publishedRevisionId!) };
@@ -60,8 +75,10 @@ export class MockScriptFlowRepository implements ScriptFlowRepository {
     this.scripts.push(script);this.revisions.push(revision);
     this.hashes.set(id+":key",key); this.hashes.set(id+":hash",input.creationPayloadHash);
     return clone({script,revision});
+    });
   }
   async commitDraft(input: SaveScriptRecord, actor: ActorContext, tool?: string): Promise<ScriptView> {
+    return this.exclusively("script:" + input.scriptId, async () => {
     const idx = this.scripts.findIndex(x=>x.id===input.scriptId&&x.leadId===input.leadId);
     if(idx<0)throw missing();
     const prior=this.scripts[idx];
@@ -76,8 +93,10 @@ export class MockScriptFlowRepository implements ScriptFlowRepository {
     await this.audit(actor,"lead_script.draft_updated",script,revision,tool);
     this.revisions.push(revision);this.scripts[idx]=script;
     return clone({script,revision});
+    });
   }
   async publishDraft(input: PublishScriptRecord, actor: ActorContext): Promise<ScriptView> {
+    return this.exclusively("script:" + input.scriptId, async () => {
     const idx=this.scripts.findIndex(x=>x.id===input.scriptId&&x.leadId===input.leadId);
     if(idx<0)throw missing();
     const prior=this.scripts[idx];
@@ -89,6 +108,7 @@ export class MockScriptFlowRepository implements ScriptFlowRepository {
     await this.audit(actor,"lead_script.published",script,revision);
     this.scripts[idx]=script;
     return clone({script,revision});
+    });
   }
 }
 export const mockScriptFlowRepository = new MockScriptFlowRepository();

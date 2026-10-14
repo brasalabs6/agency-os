@@ -76,10 +76,14 @@ export async function patchLeadScript(leadId:string,scriptId:string,input:unknow
   enabled();allowed(actor,"scripts.write");await leadExists(leadId);
   const parsed=patchScriptSchema.safeParse(input);
   if(!parsed.success)throw new DomainError("Invalid script patch request","SCRIPT_GRAPH_INVALID",422);
-  const {script,revision}=await getLeadScript(leadId,scriptId,actor,{view:"draft"});
+  // A scripts.write credential may patch a draft without also having scripts.read.
+  // Authorize the write first; load its baseline internally under that authorization.
+  const script=await repo().getByIdAndLead(scriptId,leadId);
+  if(!script)throw missing();
   if(script.version!==parsed.data.expectedVersion)
     throw new DomainError("Script changed since read","SCRIPT_VERSION_CONFLICT",409);
-  const baseline=revision??await repo().getRevision(scriptId,script.publishedRevisionId??"");
+  const baselineId=script.draftRevisionId??script.publishedRevisionId;
+  const baseline=baselineId?await repo().getRevision(scriptId,baselineId):null;
   if(!baseline)throw new DomainError("Missing source revision","SCRIPT_REVISION_NOT_FOUND",404);
   const graph=applyScriptPatch(baseline.graph,parsed.data.operations);
   await verifyEvidence(leadId,graph);
