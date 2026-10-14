@@ -1,10 +1,10 @@
 # Feature Spec — Conversation Script Graphs (roteiros comerciais navegáveis)
 
 **Produto:** AgencyOS Leads  
-**Status:** Proposed / Awaiting approval  
+**Status:** In progress (implementation PR #60; not deployed or production-enabled)  
 **Prioridade:** P1 — planejamento para implementação futura  
 **Base de análise:** main @ 8e9c48d010bdc9d904347f3f1563eabcbca8a775 (2026-10-14)  
-**Escopo desta entrega:** apenas especificação; não há implementação, migration aplicada, feature ativada ou deploy neste PR.
+**Escopo desta spec:** contrato aprovado no PR #59. A implementação ocorre no PR #60; migration, feature flag e deploy de produção permanecem operações separadas.
 
 ## 1. Objetivo
 
@@ -525,7 +525,7 @@ Reaproveitar auth, audit, services, ApprovalRequest, Conversation e Qualificatio
 
 ## 19. Pendências e gate de aprovação
 
-Esta spec é uma **proposta**, não uma declaração de feature existente. Antes de iniciar código, aprovar explicitamente:
+Esta spec é o contrato da **implementação em andamento**, não uma declaração de feature ativa em produção. Antes de iniciar código, aprovar explicitamente:
 
 1. política editorial **ADMIN publica; MEMBER/AGENT editam rascunhos**;
 2. concessão dos novos scopes a credenciais pessoais *ativas existentes* mediante migration;
