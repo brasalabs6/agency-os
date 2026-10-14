@@ -61,8 +61,8 @@ try {
 
   await page.getByRole("button", { name: "Mapa do roteiro" }).click();
   await page.getByRole("group", { name: "Mapa interativo do roteiro comercial" }).waitFor();
-  await page.getByRole("button", { name: "Aumentar zoom" }).click();
-  await page.getByRole("button", { name: "Minimapa: clique para navegar" }).waitFor();
+  await page.locator(".react-flow__controls-zoomin").click();
+  await page.locator(".react-flow__minimap").waitFor();
 
   const patched = await request("PATCH", route, {
     expectedVersion: 2, operations: [

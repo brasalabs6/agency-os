@@ -67,3 +67,11 @@ Added drag-to-pan, zoom controls, minimap and keyboard controls to the SVG map.
 8. If verification fails: immediately disable feature flag, retain tables and snapshots, investigate. Do not DROP production data.
 
 **No production merge/migration/config change is implied by the presence of this file.**
+
+## 5. Revisão complementar — React Flow e E2E
+
+A divergência registrada na seção 3, item 1, foi fechada: o mapa usa `@xyflow/react@12.12.0`, carregado via `next/dynamic` em Client Component e com a folha de estilos oficial importada após Tailwind. A estrutura de negócio permanece em JSONB, e o mapa continua sem escrita no CRM. Controles nativos de pan/zoom/minimapa, seleção de nós e destaque de trilha estão implementados; o posicionamento usa BFS determinístico com proteção contra ciclos e nós órfãos.
+
+O job `Browser E2E (guided scripts)` passou antes desta troca da biblioteca e foi atualizado para testar controles React Flow. É necessária nova execução verde no HEAD final antes do merge.
+
+A etapa Supabase `20261014194708_lead_conversation_scripts_0009` já foi aplicada e validada. Não reaplicar a migration. A ativação `CONVERSATION_SCRIPTS_ENABLED` depende do deploy de produção validado e permanece desligada até confirmação.

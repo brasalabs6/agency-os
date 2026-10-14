@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import type { ConversationScript, ScriptView } from "@/lib/domain/script-flow";
 import type { UserRole } from "@/lib/domain/types";
-import { LeadScriptMap } from "./lead-script-map";
+const LeadScriptMap = dynamic(
+  () => import("./lead-script-map").then(module => module.LeadScriptMap),
+  { ssr: false, loading: () => <p role="status" className="p-4 text-sm text-muted">Carregando o mapa…</p> }
+);
 
 type TrailStep={nodeId:string;edgeId?:string};
 type Mode="guided"|"map";
