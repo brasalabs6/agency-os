@@ -140,7 +140,8 @@ jobs:
           SQL
           for file in drizzle/[0-9][0-9][0-9][0-9]_*.sql; do
             if [[ "$file" == *"/0008_"* ]]; then
-              # A pre-existing narrowly scoped credential must remain unchanged.
+              # Seed active and revoked credentials before automation migration 0008;
+              # migration 0009 explicitly grants script draft scopes ONLY to active credentials.
               psql -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO public.users (id,name,email,role)
           VALUES ('00000000-0000-4000-8000-000000000001','Migration Tester','test@example.test','ADMIN');
@@ -148,6 +149,10 @@ jobs:
             (user_id,name,token_hash,token_prefix,scopes)
           VALUES
             ('00000000-0000-4000-8000-000000000001','pre-migration-credential','migration-test-token-hash','mcp-test','["leads.read"]'::jsonb);
+          INSERT INTO public.mcp_credentials
+            (user_id,name,token_hash,token_prefix,scopes,active,revoked_at)
+          VALUES
+            ('00000000-0000-4000-8000-000000000001','revoked-before-migration','revoked-test-token-hash','mcp-revoked','["leads.read"]'::jsonb,false,now());
           SQL
             fi
             echo "Applying $file"
@@ -163,8 +168,28 @@ jobs:
           BEGIN
             SELECT scopes INTO existing_scopes
               FROM public.mcp_credentials WHERE name='pre-migration-credential';
-            IF existing_scopes IS DISTINCT FROM '["leads.read"]'::jsonb THEN
-              RAISE EXCEPTION 'MCP scopes changed unexpectedly: %', existing_scopes;
+            IF existing_scopes IS DISTINCT FROM '["leads.read","scripts.read","scripts.write"]'::jsonb THEN
+              RAISE EXCEPTION 'Expected active legacy credential to receive script scopes only: %', existing_scopes;
+            END IF;
+            IF (SELECT scopes FROM public.mcp_credentials WHERE name='revoked-before-migration')
+                IS DISTINCT FROM '["leads.read"]'::jsonb THEN
+              RAISE EXCEPTION 'Revoked MCP credential scopes must not change';
+            END IF;
+            IF (SELECT active FROM public.mcp_credentials WHERE name='revoked-before-migration') IS DISTINCT FROM false THEN
+              RAISE EXCEPTION 'Revoked MCP credential must stay inactive';
+            END IF;
+            IF (SELECT count(*) FROM pg_tables WHERE schemaname='public'
+                AND tablename IN ('lead_conversation_scripts','lead_conversation_script_revisions')) <> 2 THEN
+              RAISE EXCEPTION 'Script tables missing after migration';
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='public' AND c.relname IN ('lead_conversation_scripts','lead_conversation_script_revisions')
+                AND NOT c.relrowsecurity) THEN
+              RAISE EXCEPTION 'Script tables missing RLS';
+            END IF;
+            IF has_table_privilege('anon','public.lead_conversation_scripts','SELECT') OR
+               has_table_privilege('authenticated','public.lead_conversation_script_revisions','SELECT') THEN
+              RAISE EXCEPTION 'Data API principals unexpectedly can read scripts';
             END IF;
 
             IF (SELECT count(*) FROM pg_tables

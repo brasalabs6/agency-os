@@ -39,7 +39,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
   const selected=scripts.find(x=>x.id===selectedId);
   const effectiveView=view==="published"&&!selected?.publishedRevisionId?"draft":view;
   useEffect(()=>{
-    if(!selectedId){setData(null);setTrail([]);return;}
+    if(!selectedId)return;
     let ignore=false;
     async function load(){
       try{
@@ -57,7 +57,7 @@ export function LeadScriptWorkspace({leadId,role}:{leadId:string;role:UserRole})
     return ()=>{ignore=true;};
   },[base,selectedId,effectiveView]);
 
-  const graph=data?.revision?.graph;
+  const graph=selectedId?data?.revision?.graph:undefined;
   const currentNode=useMemo(()=>graph?.nodes.find(x=>x.id===trail.at(-1)?.nodeId),[graph,trail]);
   const inspection=graph?.nodes.find(x=>x.id===inspectId);
   const choices=graph?.edges.filter(x=>x.source===currentNode?.id)??[];
