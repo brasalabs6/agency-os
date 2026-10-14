@@ -23,7 +23,9 @@ const graph = {
 };
 async function request(method, path, body) {
   const response = await fetch(url + path, {
-    method, headers: { "Content-Type": "application/json", Origin: url },
+    // This is a direct Node-side fixture request, not a browser-origin fetch.
+    // CSRF behavior is exercised by clicking Publish in the browser below.
+    method, headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const json = await response.json();
@@ -78,7 +80,14 @@ try {
   // A hypothetical exploration must not change the lead or conversation state.
   const current = await request("GET", route + "?view=published");
   assert.equal(current.revision.id, released.revision.id);
-  console.log("E2E PASS: mobile guided choices, back/restart, SVG map, published snapshot isolation");
+  await page.getByRole("button", { name: "Prévia do rascunho" }).click();
+  await page.getByText("Nova saudação ainda não publicada.").waitFor();
+  page.once("dialog", dialog => dialog.accept());
+  await page.getByRole("button", { name: "Publicar rascunho" }).click();
+  await page.getByText("Nova saudação ainda não publicada.").waitFor();
+  const after = await request("GET", route + "?view=published");
+  assert.equal(after.revision.id, patched.revision.id);
+  console.log("E2E PASS: mobile guided choices, navigation, map and UI publication");
 } catch (error) {
   await page.screenshot({ path: "/tmp/agencyos-scripts-e2e-failed.png", fullPage: true }).catch(() => {});
   console.error(error);
