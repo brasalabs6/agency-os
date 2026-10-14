@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   Controls,
   MarkerType,
@@ -129,7 +130,7 @@ export function LeadScriptMap({ graph, trail, onSelect }: Props) {
           nodesDraggable={false}
           nodesConnectable={false}
           edgesFocusable={false}
-          onNodeClick={(_, node) => onSelect(node.id)}
+          onNodeClick={(_, node: Node) => onSelect(node.id)}
         >
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable nodeColor={node => exploredNodes.has(node.id) ? "#60a5fa" : "#94a3b8"} />
